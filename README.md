@@ -98,7 +98,7 @@ http://your-domain.com/install.php
 ## 🖥️ Customer Portal
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/alijayanet/gembok-simple/main/assets/customer-portal.png" alt="Customer Portal" width="800">
+  <img src="https://github.com/alijayanet/gembok-simple/blob/main/assets/customer-portal.png" alt="Customer Portal" width="800">
 </p>
 
 ### Portal Features:
