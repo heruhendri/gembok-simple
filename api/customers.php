@@ -15,6 +15,19 @@ try {
     $search = $_GET['search'] ?? '';
     
     if ($method === 'GET') {
+        // Get single customer
+        if (isset($_GET['id'])) {
+            $id = (int)$_GET['id'];
+            $customer = fetchOne("SELECT * FROM customers WHERE id = ?", [$id]);
+            
+            if ($customer) {
+                echo json_encode(['success' => true, 'data' => $customer]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Customer not found']);
+            }
+            exit;
+        }
+
         // Get customers with pagination
         $offset = ($page - 1) * $perPage;
         

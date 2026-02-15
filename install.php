@@ -244,14 +244,36 @@ function createDatabaseTables() {
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     
+    CREATE TABLE IF NOT EXISTS odps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        code VARCHAR(50) UNIQUE,
+        lat DECIMAL(10,8),
+        lng DECIMAL(10,8),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    
     CREATE TABLE IF NOT EXISTS onu_locations (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100),
         serial_number VARCHAR(100) UNIQUE,
         lat DECIMAL(10,8),
         lng DECIMAL(10,8),
+        odp_id INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (odp_id) REFERENCES odps(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    
+    CREATE TABLE IF NOT EXISTS odp_links (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        from_odp_id INT NOT NULL,
+        to_odp_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (from_odp_id) REFERENCES odps(id) ON DELETE CASCADE,
+        FOREIGN KEY (to_odp_id) REFERENCES odps(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     
     CREATE TABLE IF NOT EXISTS trouble_tickets (

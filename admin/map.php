@@ -8,15 +8,12 @@ requireAdminLogin();
 
 $pageTitle = 'Peta ONU';
 
-// Get ONU locations
 $onuLocations = fetchAll("SELECT * FROM onu_locations ORDER BY name");
 
-// Calculate stats
 $totalOnu = count($onuLocations);
 $onlineOnu = 0;
 $offlineOnu = 0;
 
-// Get GenieACS device info for each ONU
 $onuData = [];
 foreach ($onuLocations as $onu) {
     $deviceInfo = genieacsGetDeviceInfo($onu['serial_number']);
@@ -27,6 +24,7 @@ foreach ($onuLocations as $onu) {
         'serial_number' => $onu['serial_number'],
         'lat' => $onu['lat'],
         'lng' => $onu['lng'],
+        'odp_id' => $onu['odp_id'],
         'status' => 'unknown',
         'device_info' => null
     ];
@@ -83,7 +81,6 @@ ob_start();
     </div>
 </div>
 
-<!-- Map Card -->
 <div class="card">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-map-marked-alt"></i> Lokasi ONU</h3>
@@ -108,8 +105,70 @@ ob_start();
     </div>
     
     <p style="margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
-        💡 <strong>Tip:</strong> Klik marker untuk melihat detail ONU, edit WiFi SSID & Password, atau reboot ONU.
+        Klik marker untuk melihat detail ONU. Garis hijau menunjukkan jalur aktif, merah menunjukkan ONU offline.
     </p>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-project-diagram"></i> ODP & Jalur</h3>
+        <button class="btn btn-secondary btn-sm" onclick="loadMarkers()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <form id="addOdpForm">
+            <h4 style="margin-bottom: 10px; color: var(--neon-cyan);"><i class="fas fa-map-pin"></i> Tambah ODP</h4>
+            <div style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9rem;">
+                Klik peta untuk memilih titik ODP, lalu simpan.
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nama ODP</label>
+                <input type="text" id="odpName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kode ODP</label>
+                <input type="text" id="odpCode" class="form-control">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Latitude</label>
+                <input type="number" id="odpLat" class="form-control" step="0.00000001">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Longitude</label>
+                <input type="number" id="odpLng" class="form-control" step="0.00000001">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="useMapCenter()">Gunakan Titik Peta</button>
+                <button type="submit" class="btn btn-primary">Simpan ODP</button>
+            </div>
+        </form>
+        
+        <form id="addOdpLinkForm">
+            <h4 style="margin-bottom: 10px; color: var(--neon-cyan);"><i class="fas fa-link"></i> Tambah Jalur ODP</h4>
+            <div class="form-group">
+                <label class="form-label">Dari ODP</label>
+                <select id="fromOdp" class="form-control" required></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Ke ODP</label>
+                <select id="toOdp" class="form-control" required></select>
+            </div>
+            <button type="submit" class="btn btn-primary">Simpan Jalur</button>
+        </form>
+    </div>
+    
+    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div>
+            <h4 style="margin-bottom: 10px; color: var(--text-secondary);"><i class="fas fa-list"></i> Daftar ODP</h4>
+            <div id="odpList" style="max-height: 240px; overflow: auto;"></div>
+        </div>
+        <div>
+            <h4 style="margin-bottom: 10px; color: var(--text-secondary);"><i class="fas fa-route"></i> Daftar Jalur</h4>
+            <div id="odpLinkList" style="max-height: 240px; overflow: auto;"></div>
+        </div>
+    </div>
 </div>
 
 <!-- ONU List -->
@@ -275,6 +334,19 @@ ob_start();
         
         <hr style="border-color: var(--border-color); margin: 15px 0;">
         
+        <h4 style="color: var(--neon-cyan); margin-bottom: 10px;"><i class="fas fa-network-wired"></i> ODP</h4>
+        
+        <div class="form-group">
+            <label class="form-label">Pilih ODP</label>
+            <select id="onuOdpSelect" class="form-control"></select>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button type="button" class="btn btn-primary" onclick="saveOnuOdp()">
+                <i class="fas fa-save"></i> Simpan ODP
+            </button>
+        </div>
+        
         <h4 style="color: var(--neon-green); margin-bottom: 10px;"><i class="fas fa-wifi"></i> WiFi Settings</h4>
         
         <div class="form-group">
@@ -306,12 +378,35 @@ ob_start();
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.flow-line-odp {
+    stroke-dasharray: 12 12;
+    stroke-linecap: round;
+    animation: odp-flow 2s linear infinite;
+}
+.flow-line-onu {
+    stroke-dasharray: 8 12;
+    stroke-linecap: round;
+    animation: onu-flow 1.6s linear infinite;
+}
+@keyframes odp-flow {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -48; }
+}
+@keyframes onu-flow {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -40; }
+}
+</style>
 
 <script>
-let map, markers = [];
+let map, markers = [], odpMarkers = [], lines = [];
 let currentLayer = 'osm';
 let osmLayer, satelliteLayer;
 let currentOnuSerial = null;
+let odpsCache = [];
+let odpLinksCache = [];
+let tempOdpMarker = null;
 
 function initMap() {
     map = L.map('map').setView([-6.200000, 106.816666], 13);
@@ -326,36 +421,99 @@ function initMap() {
     
     osmLayer.addTo(map);
     
+    map.on('click', function(e) {
+        setOdpPoint(e.latlng.lat, e.latlng.lng, true);
+    });
+    
     loadMarkers();
 }
 
 function loadMarkers() {
-    // Clear existing markers
     markers.forEach(marker => map.removeLayer(marker));
     markers = [];
+    odpMarkers.forEach(marker => map.removeLayer(marker));
+    odpMarkers = [];
+    lines.forEach(line => map.removeLayer(line));
+    lines = [];
     
-    // Fetch ONU locations from API
-    fetch('<?php echo APP_URL; ?>/api/onu_locations.php')
+    fetch('../api/onu_locations.php')
         .then(response => response.json())
         .then(result => {
-            if (result.success && result.data) {
-                result.data.forEach(onu => {
-                    const isOnline = onu.status === 'online';
-                    const marker = L.marker([onu.lat, onu.lng], {
-                        icon: L.divIcon({
-                            className: 'custom-marker',
-                            html: '<div style="background: ' + (isOnline ? '#00ff88' : '#ff4757') + '; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><i class="fas fa-satellite-dish"></i></div>'
-                        })
-                    });
-                    
-                    marker.on('click', function() {
-                        showOnuDetails(onu);
-                    });
-                    
-                    markers.push(marker);
-                    marker.addTo(map);
-                });
+            if (!result.success) {
+                alert(result.message || 'Gagal memuat data peta');
+                return;
             }
+            if (!result.data) {
+                return;
+            }
+            
+            odpsCache = result.odps || [];
+            odpLinksCache = result.odp_links || [];
+            
+            const odpIndex = {};
+            odpsCache.forEach(odp => {
+                if (odp.lat === null || odp.lng === null) return;
+                odpIndex[odp.id] = odp;
+                const marker = L.marker([odp.lat, odp.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '<div style="background: #00f5ff; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #0a0a12; font-size: 12px; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><i class="fas fa-network-wired"></i></div>'
+                    })
+                });
+                marker.bindPopup('<strong>' + (odp.name || 'ODP') + '</strong><br>' + (odp.code || ''));
+                odpMarkers.push(marker);
+                marker.addTo(map);
+            });
+            
+            odpLinksCache.forEach(link => {
+                const from = odpIndex[link.from_odp_id];
+                const to = odpIndex[link.to_odp_id];
+                if (from && to) {
+                    const line = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+                        color: '#00f5ff',
+                        weight: 3,
+                        opacity: 0.7,
+                        className: 'flow-line-odp'
+                    });
+                    lines.push(line);
+                    line.addTo(map);
+                }
+            });
+            
+            result.data.forEach(onu => {
+                if (onu.lat === null || onu.lng === null) {
+                    return;
+                }
+                const isOnline = onu.status === 'online';
+                const marker = L.marker([onu.lat, onu.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '<div style="background: ' + (isOnline ? '#00ff88' : '#ff4757') + '; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><i class="fas fa-satellite-dish"></i></div>'
+                    })
+                });
+                
+                marker.on('click', function() {
+                    showOnuDetails(onu);
+                });
+                
+                markers.push(marker);
+                marker.addTo(map);
+                
+                if (onu.odp_id && odpIndex[onu.odp_id]) {
+                    const odp = odpIndex[onu.odp_id];
+                    const color = onu.status === 'online' ? '#00ff88' : (onu.status === 'offline' ? '#ff4757' : '#9aa0a6');
+                    const line = L.polyline([[odp.lat, odp.lng], [onu.lat, onu.lng]], {
+                        color,
+                        weight: 2,
+                        opacity: 0.9,
+                        className: 'flow-line-onu'
+                    });
+                    lines.push(line);
+                    line.addTo(map);
+                }
+            });
+            
+            renderOdpLists();
         });
 }
 
@@ -396,7 +554,16 @@ function showOnuDetails(onu) {
     
     document.getElementById('modalTxPower').textContent = info.tx_power ? info.tx_power + ' dBm' : '-';
     
-    // WiFi settings
+    const odpSelect = document.getElementById('onuOdpSelect');
+    odpSelect.innerHTML = '<option value="">-</option>';
+    odpsCache.forEach(odp => {
+        const option = document.createElement('option');
+        option.value = odp.id;
+        option.textContent = odp.code ? odp.code + ' - ' + odp.name : odp.name;
+        odpSelect.appendChild(option);
+    });
+    odpSelect.value = onu.odp_id ? String(onu.odp_id) : '';
+    
     document.getElementById('wifiSsid').value = info.ssid || onu.ssid || '';
     document.getElementById('wifiPassword').value = info.wifi_password || onu.password || '';
     
@@ -447,7 +614,7 @@ function saveWifiSettings() {
     }
     
     // Call API to update WiFi settings
-    fetch('<?php echo APP_URL; ?>/api/onu_wifi.php', {
+    fetch('../api/onu_wifi.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ serial, ssid, password })
@@ -467,12 +634,37 @@ function saveWifiSettings() {
     });
 }
 
+function saveOnuOdp() {
+    const serial = currentOnuSerial;
+    const odpId = document.getElementById('onuOdpSelect').value;
+    
+    if (!serial) return;
+    
+    fetch('../api/onu_locations.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'onu_odp', serial, odp_id: odpId ? parseInt(odpId, 10) : null })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('ODP berhasil diperbarui');
+            loadMarkers();
+        } else {
+            alert('Gagal memperbarui ODP: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Terjadi kesalahan: ' + error.message);
+    });
+}
+
 function rebootOnu() {
     if (!confirm('Yakin ingin reboot ONU ini?')) return;
     
     const serial = currentOnuSerial;
     
-    fetch('<?php echo APP_URL; ?>/api/genieacs.php?action=reboot', {
+    fetch('../api/genieacs.php?action=reboot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ serial })
@@ -507,6 +699,173 @@ function toggleLayer() {
 
 function resetMap() {
     map.setView([-6.200000, 106.816666], 13);
+}
+
+function useMapCenter() {
+    if (!map) return;
+    const center = map.getCenter();
+    setOdpPoint(center.lat, center.lng, true);
+}
+
+function setOdpPoint(lat, lng, draggable = false) {
+    document.getElementById('odpLat').value = lat.toFixed(8);
+    document.getElementById('odpLng').value = lng.toFixed(8);
+    
+    if (tempOdpMarker) {
+        map.removeLayer(tempOdpMarker);
+    }
+    
+    if (draggable) {
+        tempOdpMarker = L.marker([lat, lng], {
+            draggable: true,
+            icon: L.divIcon({
+                className: 'custom-marker',
+                html: '<div style="background: #00f5ff; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>'
+            })
+        }).addTo(map);
+        
+        tempOdpMarker.on('drag', function(e) {
+            const pos = e.target.getLatLng();
+            document.getElementById('odpLat').value = pos.lat.toFixed(8);
+            document.getElementById('odpLng').value = pos.lng.toFixed(8);
+        });
+    } else {
+        tempOdpMarker = L.circleMarker([lat, lng], {
+            radius: 6,
+            color: '#00f5ff',
+            fillColor: '#00f5ff',
+            fillOpacity: 0.9,
+            weight: 2
+        }).addTo(map);
+    }
+}
+
+function renderOdpLists() {
+    const list = document.getElementById('odpList');
+    const linkList = document.getElementById('odpLinkList');
+    const fromSelect = document.getElementById('fromOdp');
+    const toSelect = document.getElementById('toOdp');
+    
+    fromSelect.innerHTML = '';
+    toSelect.innerHTML = '';
+    
+    odpsCache.forEach(odp => {
+        const option1 = document.createElement('option');
+        option1.value = odp.id;
+        option1.textContent = odp.code ? odp.code + ' - ' + odp.name : odp.name;
+        const option2 = option1.cloneNode(true);
+        fromSelect.appendChild(option1);
+        toSelect.appendChild(option2);
+    });
+    
+    if (odpsCache.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-muted);">Belum ada ODP</div>';
+    } else {
+        list.innerHTML = odpsCache.map(odp => {
+            const label = odp.code ? odp.code + ' - ' + odp.name : odp.name;
+            const coord = (odp.lat && odp.lng) ? (parseFloat(odp.lat).toFixed(6) + ', ' + parseFloat(odp.lng).toFixed(6)) : '-';
+            return '<div style="display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color);">' +
+                '<div><strong>' + label + '</strong><br><small style="color: var(--text-muted);">' + coord + '</small></div>' +
+                '<button class="btn btn-danger btn-sm" onclick="deleteOdp(' + odp.id + ')"><i class="fas fa-trash"></i></button>' +
+            '</div>';
+        }).join('');
+    }
+    
+    if (odpLinksCache.length === 0) {
+        linkList.innerHTML = '<div style="color: var(--text-muted);">Belum ada jalur</div>';
+    } else {
+        const odpIndex = {};
+        odpsCache.forEach(odp => { odpIndex[odp.id] = odp; });
+        linkList.innerHTML = odpLinksCache.map(link => {
+            const from = odpIndex[link.from_odp_id];
+            const to = odpIndex[link.to_odp_id];
+            const fromLabel = from ? (from.code ? from.code : from.name) : link.from_odp_id;
+            const toLabel = to ? (to.code ? to.code : to.name) : link.to_odp_id;
+            return '<div style="display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color);">' +
+                '<div><strong>' + fromLabel + '</strong> → <strong>' + toLabel + '</strong></div>' +
+                '<button class="btn btn-danger btn-sm" onclick="deleteOdpLink(' + link.id + ')"><i class="fas fa-trash"></i></button>' +
+            '</div>';
+        }).join('');
+    }
+}
+
+document.getElementById('addOdpForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('odpName').value.trim();
+    const code = document.getElementById('odpCode').value.trim();
+    const lat = document.getElementById('odpLat').value;
+    const lng = document.getElementById('odpLng').value;
+    
+    fetch('../api/onu_locations.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'odp', name, code, lat: lat ? parseFloat(lat) : null, lng: lng ? parseFloat(lng) : null })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            document.getElementById('odpName').value = '';
+            document.getElementById('odpCode').value = '';
+            document.getElementById('odpLat').value = '';
+            document.getElementById('odpLng').value = '';
+            loadMarkers();
+        } else {
+            alert(result.message || 'Gagal menambah ODP');
+        }
+    });
+});
+
+document.getElementById('addOdpLinkForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fromOdp = document.getElementById('fromOdp').value;
+    const toOdp = document.getElementById('toOdp').value;
+    fetch('../api/onu_locations.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'odp_link', from_odp_id: parseInt(fromOdp, 10), to_odp_id: parseInt(toOdp, 10) })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadMarkers();
+        } else {
+            alert(result.message || 'Gagal menambah jalur');
+        }
+    });
+});
+
+function deleteOdp(id) {
+    if (!confirm('Hapus ODP ini? Jalur terkait juga akan terhapus.')) return;
+    fetch('../api/onu_locations.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'odp_delete', id })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadMarkers();
+        } else {
+            alert(result.message || 'Gagal menghapus ODP');
+        }
+    });
+}
+
+function deleteOdpLink(id) {
+    if (!confirm('Hapus jalur ini?')) return;
+    fetch('../api/onu_locations.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'odp_link_delete', id })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadMarkers();
+        } else {
+            alert(result.message || 'Gagal menghapus jalur');
+        }
+    });
 }
 
 document.getElementById('onuSearch').addEventListener('input', function(e) {

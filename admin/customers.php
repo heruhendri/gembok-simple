@@ -175,12 +175,16 @@ ob_start();
             
             <div class="form-group">
                 <label class="form-label">Username PPPoE</label>
-                <input type="text" name="pppoe_username" class="form-control" required placeholder="Username di MikroTik">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" name="pppoe_username" id="pppoe_username_input" class="form-control" required placeholder="Pilih atau ketik username" style="flex: 1;">
+                    <button type="button" class="btn btn-secondary" onclick="openPppoeUserModal()">Pilih dari MikroTik</button>
+                </div>
+                <small style="color: var(--text-muted);">Pilih username PPPoE dari user MikroTik untuk menghindari salah input</small>
             </div>
             
             <div class="form-group">
                 <label class="form-label">Paket Langganan</label>
-                <select name="package_id" class="form-control" required>
+                <select name="package_id" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
                     <option value="">Pilih Paket</option>
                     <?php foreach ($packages as $pkg): ?>
                         <option value="<?php echo $pkg['id']; ?>">
@@ -322,15 +326,219 @@ ob_start();
     </div>
     <?php endif; ?>
 </div>
+        
+<!-- PPPoE User Modal -->
+<div id="pppoeUserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 700px; max-width: 90%; margin: 2rem; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: var(--neon-cyan);">
+                <i class="fas fa-network-wired"></i> Pilih Username PPPoE
+            </h3>
+            <button type="button" onclick="closePppoeUserModal()" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.25rem;">&times;</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <input type="text" id="pppoeUserSearch" class="form-control" placeholder="Cari username PPPoE...">
+        </div>
+        <div id="pppoeUserList" style="max-height: 60vh; overflow-y: auto;"></div>
+    </div>
+</div>
+        
+<!-- Edit Customer Modal -->
+<div id="editCustomerModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 800px; max-width: 90%; margin: 2rem; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: var(--neon-cyan);">
+                <i class="fas fa-edit"></i> Edit Pelanggan
+            </h3>
+            <button onclick="closeEditModal()" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.25rem;">&times;</button>
+        </div>
+        
+        <form method="POST" id="editCustomerForm">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="customer_id" id="edit_customer_id">
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <div class="form-group">
+                    <label class="form-label">Nama Pelanggan</label>
+                    <input type="text" name="name" id="edit_name" class="form-control" required placeholder="Nama Lengkap">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Nomor HP (WhatsApp)</label>
+                    <input type="text" name="phone" id="edit_phone" class="form-control" required placeholder="08xxxxxxxxxx">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Username PPPoE</label>
+                    <input type="text" name="pppoe_username" id="edit_pppoe_username" class="form-control" required placeholder="Username di MikroTik" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                    <small style="color: var(--text-muted);">Username PPPoE tidak dapat diubah</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Paket Langganan</label>
+                    <select name="package_id" id="edit_package_id" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
+                        <option value="">Pilih Paket</option>
+                        <?php foreach ($packages as $pkg): ?>
+                            <option value="<?php echo $pkg['id']; ?>">
+                                <?php echo htmlspecialchars($pkg['name']); ?> (<?php echo formatCurrency($pkg['price']); ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tanggal Isolir (1-28)</label>
+                    <input type="number" name="isolation_date" id="edit_isolation_date" class="form-control" min="1" max="28" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Alamat</label>
+                    <textarea name="address" id="edit_address" class="form-control" rows="2" placeholder="Alamat rumah"></textarea>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Lokasi (Latitude, Longitude)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" name="lat" id="edit_lat" class="form-control" placeholder="Latitude" readonly>
+                    <input type="text" name="lng" id="edit_lng" class="form-control" placeholder="Longitude" readonly>
+                </div>
+                <small style="color: var(--text-muted);">Klik pada peta untuk set lokasi</small>
+            </div>
+            
+            <div style="height: 300px; margin-top: 15px; border-radius: 8px; overflow: hidden;" id="edit-map-picker"></div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">
+                    <i class="fas fa-save"></i> Simpan Perubahan
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()" style="flex: 1;">
+                    Batal
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
 <script>
-// Initialize map
 let map, marker;
+let editMap, editMarker;
+let pppoeUsers = [];
+
+function openPppoeUserModal() {
+    const modal = document.getElementById('pppoeUserModal');
+    if (!modal) {
+        return;
+    }
+    modal.style.display = 'flex';
+    
+    const list = document.getElementById('pppoeUserList');
+    if (list) {
+        list.innerHTML = '<div style="padding: 10px; color: var(--text-secondary);">Memuat data dari MikroTik...</div>';
+    }
+    
+    fetch('../api/mikrotik.php?action=users')
+        .then(response => response.text())
+        .then(text => {
+            let data = null;
+            try {
+                const start = text.indexOf('{');
+                if (start !== -1) {
+                    data = JSON.parse(text.slice(start));
+                }
+            } catch (e) {
+                console.error('Respon MikroTik tidak valid:', text, e);
+            }
+            
+            if (data && data.success && data.data && Array.isArray(data.data.users)) {
+                pppoeUsers = data.data.users;
+                renderPppoeUserList(pppoeUsers);
+            } else if (list) {
+                list.innerHTML = '<div style="padding: 10px; color: var(--text-secondary);">Gagal mengambil data dari MikroTik</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Fetch MikroTik error:', error);
+            if (list) {
+                list.innerHTML = '<div style="padding: 10px; color: var(--text-secondary);">Gagal mengambil data dari MikroTik</div>';
+            }
+        });
+}
+
+function renderPppoeUserList(users) {
+    const list = document.getElementById('pppoeUserList');
+    if (!list) {
+        return;
+    }
+    
+    if (!users || users.length === 0) {
+        list.innerHTML = '<div style="padding: 10px; color: var(--text-secondary);">Tidak ada user PPPoE ditemukan</div>';
+        return;
+    }
+    
+    list.innerHTML = '';
+    
+    users.forEach(user => {
+        const username = user.name || user['name'];
+        if (!username) {
+            return;
+        }
+        
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'btn btn-secondary';
+        item.style.display = 'block';
+        item.style.width = '100%';
+        item.style.textAlign = 'left';
+        item.style.marginBottom = '8px';
+        item.textContent = username;
+        item.onclick = function() {
+            const input = document.getElementById('pppoe_username_input') || document.querySelector('input[name="pppoe_username"]');
+            if (input) {
+                input.value = username;
+            }
+            closePppoeUserModal();
+        };
+        
+        list.appendChild(item);
+    });
+}
+
+function closePppoeUserModal() {
+    const modal = document.getElementById('pppoeUserModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('pppoeUserSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            const filtered = (pppoeUsers || []).filter(user => {
+                const username = user.name || user['name'] || '';
+                return username.toLowerCase().includes(term);
+            });
+            renderPppoeUserList(filtered);
+        });
+    }
+    
+    const modal = document.getElementById('pppoeUserModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closePppoeUserModal();
+            }
+        });
+    }
+});
 
 function initMap() {
+    // Add map
     map = L.map('map-picker').setView([-6.200000, 106.816666], 13);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -349,6 +557,27 @@ function initMap() {
     });
 }
 
+function initEditMap() {
+    if (editMap) return;
+    
+    editMap = L.map('edit-map-picker').setView([-6.200000, 106.816666], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(editMap);
+    
+    editMap.on('click', function(e) {
+        if (editMarker) {
+            editMap.removeLayer(editMarker);
+        }
+        
+        editMarker = L.marker(e.latlng).addTo(editMap);
+        
+        document.getElementById('edit_lat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('edit_lng').value = e.latlng.lng.toFixed(6);
+    });
+}
+
 // Search functionality
 document.getElementById('searchCustomer').addEventListener('input', function(e) {
     const search = e.target.value.toLowerCase();
@@ -360,10 +589,61 @@ document.getElementById('searchCustomer').addEventListener('input', function(e) 
     });
 });
 
-// Edit customer (placeholder)
+// Edit customer
 function editCustomer(id) {
-    alert('Edit pelanggan #' + id + '\n\nFitur edit akan segera tersedia.');
+    // Show loading or something if needed
+    fetch(`../api/customers.php?id=${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const customer = data.data;
+                
+                document.getElementById('edit_customer_id').value = customer.id;
+                document.getElementById('edit_name').value = customer.name;
+                document.getElementById('edit_phone').value = customer.phone;
+                document.getElementById('edit_pppoe_username').value = customer.pppoe_username;
+                document.getElementById('edit_package_id').value = customer.package_id;
+                document.getElementById('edit_isolation_date').value = customer.isolation_date;
+                document.getElementById('edit_address').value = customer.address || '';
+                document.getElementById('edit_lat').value = customer.lat || '';
+                document.getElementById('edit_lng').value = customer.lng || '';
+                
+                // Show modal
+                document.getElementById('editCustomerModal').style.display = 'flex';
+                
+                // Initialize map if needed and set view
+                setTimeout(() => {
+                    initEditMap();
+                    editMap.invalidateSize();
+                    
+                    if (customer.lat && customer.lng) {
+                        const latlng = [customer.lat, customer.lng];
+                        editMap.setView(latlng, 15);
+                        
+                        if (editMarker) editMap.removeLayer(editMarker);
+                        editMarker = L.marker(latlng).addTo(editMap);
+                    }
+                }, 100);
+            } else {
+                alert('Gagal mengambil data pelanggan: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan saat mengambil data pelanggan');
+        });
 }
+
+function closeEditModal() {
+    document.getElementById('editCustomerModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+document.getElementById('editCustomerModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEditModal();
+    }
+});
 
 // Initialize map when page loads
 setTimeout(initMap, 500);

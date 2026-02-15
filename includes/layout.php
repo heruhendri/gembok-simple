@@ -111,6 +111,8 @@ $pageDescription = $pageDescription ?? '';
             border-right: 1px solid var(--border-color);
             z-index: 1000;
             transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header {
@@ -132,6 +134,9 @@ $pageDescription = $pageDescription ?? '';
 
         .sidebar-nav {
             padding: 20px 0;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .menu-item {
@@ -253,7 +258,7 @@ $pageDescription = $pageDescription ?? '';
         
         @media (max-width: 768px) {
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
                 gap: 15px;
             }
             
@@ -705,6 +710,11 @@ $pageDescription = $pageDescription ?? '';
                 <a href="<?php echo APP_URL; ?>/settings.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'settings.php' ? 'active' : ''; ?>">
                     <i class="fas fa-cog"></i>
                     <span>Settings</span>
+                </a>
+                
+                <a href="<?php echo APP_URL; ?>/update.php" class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'update.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Update</span>
                 </a>
                 
                 <div style="margin-top: 20px; border-top: 1px solid var(--border-color);"></div>

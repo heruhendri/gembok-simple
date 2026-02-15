@@ -6,8 +6,30 @@
 require_once '../includes/auth.php';
 requireCustomerLogin();
 
-$customer = getCurrentCustomer();
-$package = fetchOne("SELECT * FROM packages WHERE id = ?", [$customer['package_id']]);
+$customerSession = getCurrentCustomer();
+
+// Fetch fresh customer data from database to ensure synchronization
+if ($customerSession && isset($customerSession['id'])) {
+    $customer = fetchOne("SELECT * FROM customers WHERE id = ?", [$customerSession['id']]);
+    
+    // Update session with fresh data
+    if ($customer) {
+        // Keep login info that might not be in DB or different structure
+        $customer['logged_in'] = true;
+        $customer['login_time'] = $customerSession['login_time'] ?? time();
+        $_SESSION['customer'] = $customer;
+    } else {
+        $customer = $customerSession;
+    }
+} else {
+    $customer = $customerSession;
+}
+
+// Safely get the package, handling cases where package_id might not exist or be valid
+$package = null;
+if (isset($customer['package_id']) && !empty($customer['package_id'])) {
+    $package = fetchOne("SELECT * FROM packages WHERE id = ?", [$customer['package_id']]);
+}
 
 // Get current month invoice
 $currentMonth = date('Y-m');
@@ -29,17 +51,29 @@ $recentInvoices = fetchAll("
     [$customer['id']]
 );
 
-// Get ONU data from GenieACS
-$onuData = genieacsGetDevice($customer['pppoe_username']);
+// Get ONU data from GenieACS using PPPoE username lookup
+$onuData = null;
 $onuOnline = false;
 $onuSignal = 'N/A';
 
-if ($onuData) {
-    $lastInform = $onuData['_lastInform'] ?? null;
-    if ($lastInform && (time() - strtotime($lastInform)) < 300) {
-        $onuOnline = true;
+// Find device by customer's PPPoE username using the enhanced function
+$customerDevice = genieacsFindDeviceByPppoe($customer['pppoe_username']);
+
+if ($customerDevice) {
+    // Get detailed device info
+    $onuData = genieacsGetDeviceInfo($customer['pppoe_username']);
+    
+    // Determine online status
+    if ($onuData && isset($onuData['status'])) {
+        $onuOnline = ($onuData['status'] === 'online');
     }
-    $onuSignal = $onuData['VirtualParameters']['RXPower'] ?? 'N/A';
+    
+    // Get signal strength
+    if ($customerDevice && isset($customerDevice['VirtualParameters']['RXPower'])) {
+        $onuSignal = $customerDevice['VirtualParameters']['RXPower'];
+    } elseif ($onuData && isset($onuData['rx_power'])) {
+        $onuSignal = $onuData['rx_power'];
+    }
 }
 
 $pageTitle = 'Dashboard Pelanggan';
@@ -48,21 +82,6 @@ ob_start();
 ?>
 
 <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
-    <!-- Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 5px;">
-                <?php echo htmlspecialchars($customer['name']); ?>
-            </h1>
-            <p style="color: var(--text-secondary);">
-                <i class="fab fa-whatsapp"></i> <?php echo htmlspecialchars($customer['phone']); ?> | 
-                <code><?php echo htmlspecialchars($customer['pppoe_username']); ?></code>
-            </p>
-        </div>
-        <a href="logout.php" class="btn btn-secondary">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
-    </div>
 
     <!-- Package Info -->
     <div class="card">
@@ -79,7 +98,7 @@ ob_start();
                 </p>
             </div>
             <div>
-                <?php if ($customer['status'] === 'active'): ?>
+                <?php if (isset($customer['status']) && $customer['status'] === 'active'): ?>
                     <span class="badge badge-success" style="font-size: 1rem;">Aktif</span>
                 <?php else: ?>
                     <span class="badge badge-warning" style="font-size: 1rem;">Isolir</span>
@@ -172,11 +191,11 @@ ob_start();
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                 <div>
                     <p style="color: var(--text-secondary); margin-bottom: 5px;">Serial Number</p>
-                    <p><code><?php echo htmlspecialchars($onuData['_deviceId']['_SerialNumber'] ?? '-'); ?></code></p>
+                    <p><code><?php echo htmlspecialchars($customerDevice['_deviceId']['_SerialNumber'] ?? $onuData['_deviceId']['_SerialNumber'] ?? '-'); ?></code></p>
                 </div>
                 <div>
                     <p style="color: var(--text-secondary); margin-bottom: 5px;">Model</p>
-                    <p><?php echo htmlspecialchars($onuData['InternetGatewayDevice']['DeviceInfo']['ModelName'] ?? 'N/A'); ?></p>
+                    <p><?php echo htmlspecialchars($customerDevice['InternetGatewayDevice']['DeviceInfo']['ModelName'] ?? $onuData['InternetGatewayDevice']['DeviceInfo']['ModelName'] ?? 'N/A'); ?></p>
                 </div>
                 <div>
                     <p style="color: var(--text-secondary); margin-bottom: 5px;">Status</p>
@@ -650,6 +669,8 @@ document.addEventListener('DOMContentLoaded', function() {
 .alert-error { background: rgba(255, 71, 87, 0.1); border: 1px solid var(--neon-red); color: var(--neon-red); }
 </style>
 
+</div> <!-- Close the wrapper div -->
+
 <?php
 $content = ob_get_clean();
-echo $content;
+require_once '../includes/customer_layout.php';

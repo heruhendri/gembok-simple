@@ -96,9 +96,9 @@ function delete($table, $where, $params = []) {
 
 function tableExists($table) {
     $pdo = getDB();
-    $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
-    $stmt->execute([$table]);
-    return $stmt->rowCount() > 0;
+    $quoted = $pdo->quote($table);
+    $stmt = $pdo->query("SHOW TABLES LIKE {$quoted}");
+    return $stmt ? $stmt->rowCount() > 0 : false;
 }
 
 function beginTransaction() {

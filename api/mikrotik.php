@@ -5,6 +5,7 @@
 
 header('Content-Type: application/json');
 
+require_once '../includes/db.php';
 require_once '../includes/functions.php';
 
 try {
@@ -47,47 +48,14 @@ try {
                 ]
             ]);
         } elseif ($action === 'profiles') {
-            // Get PPPoE profiles
-            $socket = mikrotikConnect();
-            if (!$socket) {
-                echo json_encode(['success' => false, 'message' => 'Cannot connect to MikroTik']);
-                exit;
-            }
-            
-            mikrotikLogin($socket);
-            mikrotikWrite($socket, '/ppp/profile/print');
-            
-            $response = mikrotikRead($socket);
-            fclose($socket);
-            
-            $profiles = [];
-            $lines = explode("\n", $response);
-            $currentProfile = [];
-            
-            foreach ($lines as $line) {
-                if (strpos($line, '!done') !== false) {
-                    if (!empty($currentProfile)) {
-                        $profiles[] = $currentProfile;
-                        $currentProfile = [];
-                    }
-                    break;
-                }
-                
-                if (preg_match('/^=([a-zA-Z0-9_-+)=(.*)$/', $line, $matches)) {
-                    $currentProfile[$matches[1]] = $matches[2];
-                } elseif (strpos($line, '!re') !== false) {
-                    if (!empty($currentProfile)) {
-                        $profiles[] = $currentProfile;
-                        $currentProfile = [];
-                    }
-                }
-            }
+            // Get PPPoE profiles using shared helper
+            $profiles = mikrotikGetProfiles();
             
             echo json_encode([
                 'success' => true,
                 'data' => [
                     'profiles' => $profiles,
-                    'total' => count($profiles)
+                    'total' => is_array($profiles) ? count($profiles) : 0
                 ]
             ]);
         } else {

@@ -63,7 +63,6 @@ function generateInvoiceNumber() {
     return $prefix . str_pad($newNum, 6, '0', STR_PAD_LEFT);
 }
 
-// Send WhatsApp message
 function sendWhatsApp($phone, $message) {
     require_once 'whatsapp.php';
     
@@ -81,7 +80,24 @@ function sendWhatsApp($phone, $message) {
     return $result['success'] ?? false;
 }
 
-// Log error
+function getCustomerDueDate($customer, $baseDate = null) {
+    $baseTimestamp = $baseDate ? strtotime($baseDate) : time();
+    $year = date('Y', $baseTimestamp);
+    $month = date('m', $baseTimestamp);
+    $day = isset($customer['isolation_date']) ? (int)$customer['isolation_date'] : 20;
+    if ($day < 1) {
+        $day = 1;
+    }
+    if ($day > 28) {
+        $day = 28;
+    }
+    $lastDay = (int)date('t', strtotime($year . '-' . $month . '-01'));
+    if ($day > $lastDay) {
+        $day = $lastDay;
+    }
+    return date('Y-m-d', strtotime($year . '-' . $month . '-' . str_pad($day, 2, '0', STR_PAD_LEFT)));
+}
+
 function logError($message) {
     $logFile = __DIR__ . '/../logs/error.log';
     $logDir = dirname($logFile);

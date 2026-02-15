@@ -20,6 +20,7 @@ define('MIKROTIK_PORT', 8700);
 define('APP_NAME', 'GEMBOK');
 define('APP_URL', 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']));
 define('APP_VERSION', '2.0.0');
+define('GEMBOK_UPDATE_VERSION_URL', 'https://raw.githubusercontent.com/alijayanet/gembok-simple/main/version.txt');
 
 // Security
 define('ENCRYPTION_KEY', bin2hex(random_bytes(32)));
@@ -27,6 +28,9 @@ define('ENCRYPTION_KEY', bin2hex(random_bytes(32)));
 // WhatsApp Configuration
 define('WHATSAPP_API_URL', '');
 define('WHATSAPP_TOKEN', '');
+define('FONNTE_API_TOKEN', '');
+define('WABLAS_API_TOKEN', '');
+define('MPWA_API_KEY', '');
 
 // Tripay Configuration
 define('TRIPAY_API_KEY', '');

@@ -183,7 +183,7 @@ ob_start();
             
             <div class="form-group">
                 <label class="form-label">Profile MikroTik (Normal)</label>
-                <select name="profile_normal" id="profile_normal" class="form-control" required>
+                <select name="profile_normal" id="profile_normal" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
                     <?php foreach ($mikrotikProfiles as $profile): ?>
                         <option value="<?php echo htmlspecialchars($profile['name']); ?>">
                             <?php echo htmlspecialchars($profile['name']); ?>
@@ -196,7 +196,7 @@ ob_start();
             
             <div class="form-group">
                 <label class="form-label">Profile MikroTik (Isolir)</label>
-                <select name="profile_isolir" id="profile_isolir" class="form-control" required>
+                <select name="profile_isolir" id="profile_isolir" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
                     <?php foreach ($mikrotikProfiles as $profile): ?>
                         <option value="<?php echo htmlspecialchars($profile['name']); ?>">
                             <?php echo htmlspecialchars($profile['name']); ?>
@@ -305,7 +305,7 @@ ob_start();
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="form-group">
                     <label class="form-label">Profile Normal</label>
-                    <select name="profile_normal" id="edit_profile_normal" class="form-control" required>
+                    <select name="profile_normal" id="edit_profile_normal" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
                         <?php foreach ($mikrotikProfiles as $profile): ?>
                             <option value="<?php echo htmlspecialchars($profile['name']); ?>">
                                 <?php echo htmlspecialchars($profile['name']); ?>
@@ -317,7 +317,7 @@ ob_start();
                 
                 <div class="form-group">
                     <label class="form-label">Profile Isolir</label>
-                    <select name="profile_isolir" id="edit_profile_isolir" class="form-control" required>
+                    <select name="profile_isolir" id="edit_profile_isolir" class="form-control" required style="color: var(--text-primary); background: var(--bg-card);">
                         <?php foreach ($mikrotikProfiles as $profile): ?>
                             <option value="<?php echo htmlspecialchars($profile['name']); ?>">
                                 <?php echo htmlspecialchars($profile['name']); ?>

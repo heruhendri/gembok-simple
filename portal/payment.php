@@ -250,4 +250,4 @@ function selectPaymentMethod(methodCode) {
 
 <?php
 $content = ob_get_clean();
-require_once '../includes/layout.php';
+require_once '../includes/customer_layout.php';

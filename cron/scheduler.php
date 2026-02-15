@@ -208,12 +208,13 @@ function runAutoInvoice($pdo) {
             $package = fetchOne("SELECT * FROM packages WHERE id = ?", [$customer['package_id']]);
             
             if ($package) {
+                $dueDate = getCustomerDueDate($customer, $currentMonth . '-01');
                 $invoiceData = [
                     'invoice_number' => generateInvoiceNumber(),
                     'customer_id' => $customer['id'],
                     'amount' => $package['price'],
                     'status' => 'unpaid',
-                    'due_date' => date('Y-m-d', strtotime('+' . $customer['isolation_date'] . ' days')),
+                    'due_date' => $dueDate,
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 

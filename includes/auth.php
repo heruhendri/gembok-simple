@@ -42,13 +42,13 @@ function adminLogout() {
     unset($_SESSION['admin']);
     session_destroy();
     
-    redirect('admin/login.php');
+    redirect(APP_URL . '/login.php');
 }
 
 function requireAdminLogin() {
     if (!isAdminLoggedIn()) {
         setFlash('error', 'Silakan login terlebih dahulu');
-        redirect('admin/login.php');
+        redirect(APP_URL . '/login.php');
     }
 }
 
@@ -84,13 +84,13 @@ function customerLogout() {
     unset($_SESSION['customer']);
     session_destroy();
     
-    redirect('portal/login.php');
+    redirect(APP_URL . '/login.php');
 }
 
 function requireCustomerLogin() {
     if (!isCustomerLoggedIn()) {
         setFlash('error', 'Silakan login terlebih dahulu');
-        redirect('portal/login.php');
+        redirect(APP_URL . '/login.php');
     }
 }
 

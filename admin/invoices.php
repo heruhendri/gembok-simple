@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Generate invoices for all active customers
                 $customers = fetchAll("SELECT * FROM customers WHERE status = 'active'");
                 $generatedCount = 0;
+                $currentMonth = date('Y-m');
                 
                 foreach ($customers as $customer) {
                     // Check if invoice already exists for this month
-                    $currentMonth = date('Y-m');
                     $existingInvoice = fetchOne("
                         SELECT id FROM invoices 
                         WHERE customer_id = ? 
@@ -31,12 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $package = fetchOne("SELECT * FROM packages WHERE id = ?", [$customer['package_id']]);
                         
                         if ($package) {
+                            $dueDate = getCustomerDueDate($customer, $currentMonth . '-01');
                             $invoiceData = [
                                 'invoice_number' => generateInvoiceNumber(),
                                 'customer_id' => $customer['id'],
                                 'amount' => $package['price'],
                                 'status' => 'unpaid',
-                                'due_date' => date('Y-m-d', strtotime('+' . $customer['isolation_date'] . ' days')),
+                                'due_date' => $dueDate,
                                 'created_at' => date('Y-m-d H:i:s')
                             ];
                             
@@ -86,6 +87,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         setFlash('success', 'Pelanggan berhasil di-unisolate (tagihan tetap belum lunas)');
                     } else {
                         setFlash('error', 'Gagal meng-unisolate pelanggan');
+                    }
+                } else {
+                    setFlash('error', 'Invoice tidak ditemukan atau sudah lunas');
+                }
+                redirect('invoices.php');
+                break;
+            
+            case 'defer_next_month':
+                $invoiceId = (int)$_POST['invoice_id'];
+                $invoice = fetchOne("SELECT * FROM invoices WHERE id = ?", [$invoiceId]);
+                
+                if ($invoice && $invoice['status'] === 'unpaid') {
+                    $customer = fetchOne("SELECT * FROM customers WHERE id = ?", [$invoice['customer_id']]);
+                    
+                    if ($customer) {
+                        $nextMonthBase = date('Y-m-01', strtotime('+1 month'));
+                        $newDueDate = getCustomerDueDate($customer, $nextMonthBase);
+                        
+                        $description = $invoice['description'] ?? '';
+                        $note = 'Ditunda ke bulan berikutnya dari due date ' . $invoice['due_date'];
+                        if ($description) {
+                            $description .= ' | ' . $note;
+                        } else {
+                            $description = $note;
+                        }
+                        
+                        update('invoices', [
+                            'due_date' => $newDueDate,
+                            'description' => $description,
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ], 'id = ?', [$invoiceId]);
+                        
+                        if (isCustomerIsolated($invoice['customer_id'])) {
+                            unisolateCustomer($invoice['customer_id']);
+                        }
+                        
+                        setFlash('success', 'Invoice ditunda ke bulan berikutnya dan isolir pelanggan dibuka (jika sebelumnya terisolir).');
+                        logActivity('DEFER_INVOICE', "Invoice: {$invoice['invoice_number']} deferred to {$newDueDate}");
+                    } else {
+                        setFlash('error', 'Pelanggan tidak ditemukan untuk invoice ini');
                     }
                 } else {
                     setFlash('error', 'Invoice tidak ditemukan atau sudah lunas');
@@ -352,6 +393,14 @@ ob_start();
                                     <input type="hidden" name="invoice_id" value="<?php echo $inv['id']; ?>">
                                     <button type="submit" class="btn btn-secondary btn-sm" title="Buka Isolir" style="background: var(--neon-purple); border-color: var(--neon-purple);">
                                         <i class="fas fa-unlock"></i>
+                                    </button>
+                                </form>
+                                
+                                <form method="POST" style="display: inline;" onsubmit="return confirm('Tunda jatuh tempo invoice ini ke bulan berikutnya dan buka isolir pelanggan (jika terisolir)?');">
+                                    <input type="hidden" name="action" value="defer_next_month">
+                                    <input type="hidden" name="invoice_id" value="<?php echo $inv['id']; ?>">
+                                    <button type="submit" class="btn btn-secondary btn-sm" title="Tunda ke Bulan Depan" style="background: var(--neon-cyan); border-color: var(--neon-cyan);">
+                                        <i class="fas fa-calendar-plus"></i>
                                     </button>
                                 </form>
                             <?php endif; ?>
