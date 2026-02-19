@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $profile = sanitize($_POST['profile']);
         $timelimit = sanitize($_POST['timelimit'] ?? '');
         $datalimit = sanitize($_POST['datalimit'] ?? '');
+        $charMode = sanitize($_POST['char_mode'] ?? 'alphanumeric'); // alphanumeric, numeric, alpha
 
         $profilePrice = 0;
         $profileValidity = '';
@@ -42,9 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mikhmonComment = 'vc-' . date('d.m.y') . '-' . $profile;
 
         $successCount = 0;
+        $generatedVouchers = [];
         for ($i = 0; $i < $qty; $i++) {
-            $user = $prefix . generateRandomString($length);
-            $pass = ($userMode === 'up') ? generateRandomString($length) : $user;
+            $user = $prefix . generateRandomString($length, $charMode);
+            $pass = ($userMode === 'up') ? generateRandomString($length, $charMode) : $user;
 
             $extraData = [
                 'server' => $server,
@@ -59,7 +61,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($profilePrice > 0) {
                     recordHotspotSale($user, $profile, $profilePrice, $profileSelling, $prefix);
                 }
+                // Store generated voucher for printing
+                $generatedVouchers[] = [
+                    'username' => $user,
+                    'password' => $pass,
+                    'profile' => $profile,
+                    'price' => $profilePrice > 0 ? formatCurrency($profilePrice) : '-',
+                    'validity' => $timelimit ?: '-'
+                ];
             }
+        }
+
+        // Store generated vouchers in session for printing
+        if (!empty($generatedVouchers)) {
+            $_SESSION['generated_vouchers'] = $generatedVouchers;
         }
 
         setFlash('success', "Berhasil generate $successCount voucher.");
@@ -177,6 +192,14 @@ ob_start();
                 <input type="text" name="prefix" class="form-control" placeholder="ABC-">
             </div>
             <div class="form-group">
+                <label class="form-label">Karakter</label>
+                <select name="char_mode" class="form-control">
+                    <option value="alphanumeric">Huruf & Angka</option>
+                    <option value="numeric">Hanya Angka</option>
+                    <option value="alpha">Hanya Huruf</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label class="form-label">Profile</label>
                 <select name="profile" class="form-control" required>
                     <?php foreach ($hotspotProfiles as $p): ?>
@@ -198,6 +221,11 @@ ob_start();
         <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
             <i class="fas fa-rocket"></i> Generate
         </button>
+        <?php if (isset($_SESSION['generated_vouchers']) && !empty($_SESSION['generated_vouchers'])): ?>
+        <button type="button" class="btn btn-success" style="margin-top: 10px;" onclick="printGeneratedVouchers()">
+            <i class="fas fa-print"></i> Print Voucher
+        </button>
+        <?php endif; ?>
     </form>
 </div>
 
@@ -474,6 +502,35 @@ ob_start();
             + '<input type="hidden" name="name" value="' + name.replace(/"/g, '&quot;') + '">';
         document.body.appendChild(form);
         form.submit();
+    }
+
+    function printGeneratedVouchers() {
+        // Get generated vouchers from PHP session
+        const generatedVouchers = <?php echo isset($_SESSION['generated_vouchers']) ? json_encode($_SESSION['generated_vouchers']) : '[]'; ?>;
+        
+        if (generatedVouchers.length === 0) {
+            alert('Tidak ada voucher untuk dicetak.');
+            return;
+        }
+
+        // Prepare voucher data for print
+        const voucherData = generatedVouchers.map(v => ({
+            username: v.username,
+            password: v.password,
+            profile: v.profile,
+            price: v.price,
+            validity: v.validity,
+            hotspotname: 'Gembok WiFi',
+            dnsname: 'hotspot.net'
+        }));
+
+        // Get selected template from dropdown or use default
+        const templateSelect = document.getElementById('templateSelect');
+        const selectedTemplate = templateSelect ? templateSelect.value : 'mikhmon_style.php';
+
+        // Open print page with voucher data and template
+        const printUrl = 'print_vouchers.php?vouchers=' + encodeURIComponent(JSON.stringify(voucherData)) + '&template=' + encodeURIComponent(selectedTemplate);
+        window.open(printUrl, '_blank');
     }
 </script>
 

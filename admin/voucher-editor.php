@@ -60,7 +60,8 @@ ob_start();
 ?>
 
 <div class="row" style="display: flex; flex-wrap: wrap; gap: 20px;">
-    <div class="col-8" style="flex: 1; min-width: 600px;">
+    <!-- Left Column: Edit Template -->
+    <div style="flex: 2; min-width: 500px;">
         <div class="card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 class="card-title"><i class="fas fa-edit"></i> Edit Template:
@@ -86,11 +87,21 @@ ob_start();
                     </div>
                 <?php endif; ?>
 
-                <form method="POST">
+                <form method="POST" id="templateForm">
                     <input type="hidden" name="action" value="save">
                     <div class="form-group">
+                        <label>Pilih Template</label>
+                        <select name="template_select" id="templateSelect" class="form-control" onchange="changeTemplate()">
+                            <?php foreach ($templateList as $t): ?>
+                                <option value="<?php echo htmlspecialchars($t); ?>" <?php echo $t === $selectedTemplate ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($t); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Nama File</label>
-                        <input type="text" name="filename" class="form-control"
+                        <input type="text" name="filename" id="filenameInput" class="form-control"
                             value="<?php echo htmlspecialchars($selectedTemplate); ?>" <?php echo $selectedTemplate === 'default.php' ? 'readonly' : ''; ?>>
                     </div>
                     <div class="form-group">
@@ -104,11 +115,36 @@ ob_start();
                 </form>
             </div>
         </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-th-large"></i> Preview Semua Template</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <?php foreach ($templateList as $t): ?>
+                        <div onclick="selectTemplate('<?php echo urlencode($t); ?>')"
+                            style="cursor: pointer; border: 2px solid <?php echo $t === $selectedTemplate ? 'var(--neon-cyan)' : 'var(--border-color)'; ?>; 
+                                   border-radius: 8px; overflow: hidden; transition: all 0.3s;"
+                            onmouseover="this.style.borderColor='var(--neon-cyan)'"
+                            onmouseout="this.style.borderColor='<?php echo $t === $selectedTemplate ? 'var(--neon-cyan)' : 'var(--border-color)'; ?>'"
+                            title="Klik untuk edit: <?php echo htmlspecialchars($t); ?>">
+                            <div style="padding: 8px; background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%); 
+                                        text-align: center; font-size: 11px; color: var(--text-secondary);">
+                                <?php echo htmlspecialchars(str_replace('.php', '', $t)); ?>
+                            </div>
+                            <iframe src="preview_template.php?template=<?php echo urlencode($t); ?>"
+                                style="width: 100%; height: 120px; border: none; background: white;"></iframe>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="col-4">
-        <!-- Live Preview Card -->
-        <div class="card" style="position: sticky; top: 20px;">
+    <!-- Right Column: Live Preview & Others -->
+    <div style="flex: 1; min-width: 350px;">
+        <div class="card">
             <div class="card-header">
                 <h3 class="card-title text-cyan"><i class="fas fa-eye"></i> Live Preview</h3>
             </div>
@@ -133,8 +169,14 @@ ob_start();
                 <div class="list-group">
                     <?php foreach ($templateList as $t): ?>
                         <a href="?template=<?php echo urlencode($t); ?>"
-                            class="list-group-item <?php echo $t === $selectedTemplate ? 'active' : ''; ?>">
-                            <?php echo htmlspecialchars($t); ?>
+                            class="list-group-item <?php echo $t === $selectedTemplate ? 'active' : ''; ?>"
+                            style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><?php echo htmlspecialchars($t); ?></span>
+                            <button onclick="copyTemplate('<?php echo htmlspecialchars($t); ?>')" 
+                                style="background: none; border: none; color: inherit; cursor: pointer;"
+                                title="Copy Template">
+                                <i class="fas fa-copy"></i>
+                            </button>
                         </a>
                     <?php endforeach; ?>
                 </div>
@@ -193,6 +235,8 @@ ob_start();
 <script>
     const editor = document.getElementById('templateEditor');
     const previewFrame = document.getElementById('previewFrame');
+    const templateSelect = document.getElementById('templateSelect');
+    const filenameInput = document.getElementById('filenameInput');
 
     function updatePreview() {
         let content = editor.value;
@@ -232,11 +276,67 @@ ob_start();
         doc.close();
     }
 
+    // Change template function
+    function changeTemplate() {
+        const selectedTemplate = templateSelect.value;
+        
+        // Update filename input
+        filenameInput.value = selectedTemplate;
+        
+        // Load template content
+        fetch('../templates/vouchers/' + selectedTemplate)
+            .then(response => response.text())
+            .then(content => {
+                // Update editor content
+                editor.value = content;
+                
+                // Update preview
+                updatePreview();
+            })
+            .catch(error => {
+                console.error('Failed to load template:', error);
+            });
+    }
+
     // Initial preview
     updatePreview();
 
     // Live update on input
     editor.addEventListener('input', updatePreview);
+
+    // Copy template function
+    function copyTemplate(templateName) {
+        event.stopPropagation();
+        
+        if (confirm('Copy template "' + templateName + '"?')) {
+            // Get template content
+            const templateDir = '../templates/vouchers/';
+            fetch(templateDir + templateName)
+                .then(response => response.text())
+                .then(content => {
+                    // Generate new filename
+                    const baseName = templateName.replace('.php', '');
+                    const newName = baseName + '_copy.php';
+                    
+                    // Set the editor content and filename
+                    editor.value = content;
+                    document.querySelector('input[name="filename"]').value = newName;
+                    
+                    // Update preview
+                    updatePreview();
+                    
+                    alert('Template "' + templateName + '" berhasil di-copy sebagai "' + newName + '"');
+                })
+                .catch(error => {
+                    alert('Gagal copy template: ' + error.message);
+                });
+        }
+    }
+
+    // Select template function
+    function selectTemplate(templateName) {
+        window.location.href = '?template=' + encodeURIComponent(templateName);
+    }
 </script>
 
 <style>
