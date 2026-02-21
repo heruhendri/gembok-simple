@@ -67,6 +67,12 @@ $selectedPaymentMethod = $_POST['payment_method'] ?? '';
 $paymentLink = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+        setFlash('error', 'Sesi tidak valid atau telah kadaluarsa. Silakan coba lagi.');
+        redirect('payment.php?invoice_id=' . $invoiceId);
+    }
+
     $selectedPaymentMethod = $_POST['payment_method'] ?? '';
     
     if (empty($selectedPaymentMethod)) {
@@ -116,6 +122,7 @@ ob_start();
             </div>
         <?php else: ?>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                 <div class="form-group">
                     <label class="form-label">Metode Pembayaran</label>
                     <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">

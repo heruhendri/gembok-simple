@@ -12,6 +12,12 @@ if (isCustomerLoggedIn()) {
 
 // Handle login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+        setFlash('error', 'Sesi tidak valid atau telah kadaluarsa. Silakan coba lagi.');
+        redirect('login.php');
+    }
+
     $phone = $_POST['phone'] ?? '';
     $password = $_POST['password'] ?? '';
 
@@ -52,6 +58,7 @@ ob_start();
         <?php endif; ?>
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <div class="form-group" style="margin-bottom: 20px;">
                 <label class="form-label"
                     style="display: block; margin-bottom: 8px; font-weight: 600; color: #ffffff;">Nomor HP</label>

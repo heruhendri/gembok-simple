@@ -28,6 +28,23 @@ try {
     $paymentType = $data['payment_type'] ?? '';
     $transactionTime = $data['transaction_time'] ?? '';
     $grossAmount = $data['gross_amount'] ?? '';
+    $signatureKey = $data['signature_key'] ?? '';
+    $statusCode = $data['status_code'] ?? '';
+
+    // Verify signature
+    if (!defined('MIDTRANS_API_KEY')) {
+        logError('Midtrans webhook: API Key not configured');
+        echo json_encode(['success' => false, 'message' => 'Configuration error']);
+        exit;
+    }
+
+    $expectedSignature = hash('sha512', $orderId . $statusCode . $grossAmount . MIDTRANS_API_KEY);
+    
+    if ($signatureKey !== $expectedSignature) {
+        logError('Midtrans webhook: Invalid signature');
+        echo json_encode(['success' => false, 'message' => 'Invalid signature']);
+        exit;
+    }
     
     // Log webhook
     $pdo = getDB();
