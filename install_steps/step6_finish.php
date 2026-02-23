@@ -20,7 +20,7 @@
     <ul style="margin: 10px 0 0 20px; color: #666;">
         <li>Create configuration file (includes/config.php)</li>
         <li>Create all database tables</li>
-        <li>Insert default data (admin user, sample packages)</li>
+        <li>Insert admin user dan pengaturan dasar (tanpa data sample)</li>
         <li>Create installation lock file</li>
     </ul>
 </div>

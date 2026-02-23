@@ -17,7 +17,13 @@ $stats = [
     'totalInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices")['total'] ?? 0,
     'paidInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices WHERE status = 'paid'")['total'] ?? 0,
     'pendingInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices WHERE status = 'unpaid'")['total'] ?? 0,
-    'totalRevenue' => fetchOne("SELECT SUM(amount) as total FROM invoices WHERE status = 'paid'")['total'] ?? 0,
+    'totalRevenue' => fetchOne("
+        SELECT SUM(amount) as total 
+        FROM invoices 
+        WHERE status = 'paid' 
+        AND paid_at IS NOT NULL
+        AND DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+    ")['total'] ?? 0,
 ];
 
 // Get recent invoices
@@ -225,12 +231,12 @@ ob_start();
         <div style="font-size: 2.2rem; font-weight: 800;"><?php echo $stats['isolatedCustomers']; ?></div>
         <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-user-lock"></i> Pelanggan Isolir</div>
     </div>
-    <!-- Total Pendapatan -->
+    <!-- Total Pendapatan Bulan Ini -->
     <div style="background: linear-gradient(135deg, #ec4899, #db2777); border-radius: 12px; padding: 20px; text-align: center; color: white; transition: transform 0.2s, box-shadow 0.2s;"
          onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(236,72,153,0.4)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
         <div style="font-size: 1.5rem; font-weight: 800; margin-bottom: 5px;"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
-        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-wallet"></i> Total Pendapatan</div>
+        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-wallet"></i> Total Pendapatan Bulan Ini</div>
     </div>
 </div>
 

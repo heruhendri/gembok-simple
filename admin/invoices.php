@@ -234,6 +234,9 @@ $customers = fetchAll("SELECT id, name, pppoe_username, package_id FROM customer
 $totalInvoices = count($invoices);
 $paidInvoices = count(array_filter($invoices, fn($i) => $i['status'] === 'paid'));
 $unpaidInvoices = $totalInvoices - $paidInvoices;
+$currentMonthKey = date('Y-m');
+$paidThisMonth = array_filter($invoices, fn($i) => $i['status'] === 'paid' && !empty($i['paid_at']) && date('Y-m', strtotime($i['paid_at'])) === $currentMonthKey);
+$monthRevenue = array_sum(array_column($paidThisMonth, 'amount'));
 
 ob_start();
 ?>
@@ -275,8 +278,8 @@ ob_start();
             <i class="fas fa-money-bill"></i>
         </div>
         <div class="stat-info">
-            <h3><?php echo formatCurrency(array_sum(array_column(array_filter($invoices, fn($i) => $i['status'] === 'paid'), 'amount'))); ?></h3>
-            <p>Total Pendapatan</p>
+            <h3><?php echo formatCurrency($monthRevenue); ?></h3>
+            <p>Total Pendapatan Bulan Ini</p>
         </div>
     </div>
 </div>

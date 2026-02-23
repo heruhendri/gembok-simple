@@ -393,24 +393,10 @@ function insertDefaultData() {
     
     $pdo = getDB();
     
-    // Insert admin user
     $admin = $_SESSION['admin_config'];
     $stmt = $pdo->prepare("INSERT IGNORE INTO admin_users (username, password, email, created_at) VALUES (?, ?, ?, NOW())");
     $stmt->execute([$admin['username'], $admin['password'], $admin['email']]);
     
-    // Insert default packages
-    $packages = [
-        ['Paket 10 Mbps', 150000, '10Mbps', 'isolir-10Mbps'],
-        ['Paket 20 Mbps', 250000, '20Mbps', 'isolir-20Mbps'],
-        ['Paket 50 Mbps', 350000, '50Mbps', 'isolir-50Mbps']
-    ];
-    
-    foreach ($packages as $pkg) {
-        $stmt = $pdo->prepare("INSERT INTO packages (name, price, profile_normal, profile_isolir) VALUES (?, ?, ?, ?)");
-        $stmt->execute($pkg);
-    }
-    
-    // Insert default settings
     $settings = [
         ['app_name', 'GEMBOK'],
         ['app_version', '2.0.0'],
@@ -424,8 +410,7 @@ function insertDefaultData() {
         $stmt = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
         $stmt->execute($setting);
     }
-    
-    // Insert default cron schedules
+
     $cronSchedules = [
         ['Auto Invoice', 'auto_invoice', 'monthly', '00:00', 1],
         ['Auto Isolir', 'auto_isolir', 'daily', '00:00', 1],
@@ -435,20 +420,6 @@ function insertDefaultData() {
     foreach ($cronSchedules as $schedule) {
         $stmt = $pdo->prepare("INSERT IGNORE INTO cron_schedules (name, task_type, schedule_days, schedule_time, is_active) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute($schedule);
-    }
-
-    // Insert default router from session
-    if (isset($_SESSION['mikrotik_config'])) {
-        $mc = $_SESSION['mikrotik_config'];
-        $stmt = $pdo->prepare("INSERT INTO routers (name, host, username, password, port, is_active) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            'Main Router',
-            $mc['host'],
-            $mc['user'],
-            $mc['pass'],
-            $mc['port'],
-            1
-        ]);
     }
 }
 ?>
