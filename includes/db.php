@@ -96,10 +96,15 @@ function delete($table, $where, $params = []) {
 }
 
 function tableExists($table) {
-    $pdo = getDB();
-    $quoted = $pdo->quote($table);
-    $stmt = $pdo->query("SHOW TABLES LIKE {$quoted}");
-    return $stmt ? $stmt->rowCount() > 0 : false;
+    try {
+        $pdo = getDB();
+        $quoted = $pdo->quote($table);
+        $stmt = $pdo->query("SHOW TABLES LIKE {$quoted}");
+        return $stmt ? $stmt->rowCount() > 0 : false;
+    } catch (PDOException $e) {
+        logError("Database Query Error: " . $e->getMessage());
+        return false;
+    }
 }
 
 function beginTransaction() {

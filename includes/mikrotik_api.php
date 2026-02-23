@@ -85,6 +85,9 @@ function getMikrotikSettings($routerId = null)
 // Get all routers from database
 function getAllRouters()
 {
+    if (!tableExists('routers')) {
+        return [];
+    }
     return fetchAll("SELECT * FROM routers ORDER BY name ASC");
 }
 /**

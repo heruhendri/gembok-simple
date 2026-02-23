@@ -91,23 +91,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get data with pagination
 $page = (int)($_GET['page'] ?? 1);
-$perPage = ITEMS_PER_PAGE;
+$perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 20;
 $offset = ($page - 1) * $perPage;
 
-$totalCustomers = fetchOne("SELECT COUNT(*) as total FROM customers")['total'] ?? 0;
-$totalPages = ceil($totalCustomers / $perPage);
+$customersTableExists = tableExists('customers');
+$packagesTableExists = tableExists('packages');
+$routersTableExists = tableExists('routers');
 
-$customers = fetchAll("
-    SELECT c.*, p.name as package_name, p.price as package_price, r.name as router_name
-    FROM customers c 
-    LEFT JOIN packages p ON c.package_id = p.id 
-    LEFT JOIN routers r ON c.router_id = r.id
-    ORDER BY c.created_at DESC
-    LIMIT $perPage OFFSET $offset
-");
+if ($customersTableExists) {
+    $totalCustomers = fetchOne("SELECT COUNT(*) as total FROM customers")['total'] ?? 0;
+    $totalPages = ceil($totalCustomers / $perPage);
 
-$packages = fetchAll("SELECT * FROM packages ORDER BY name");
-$routers = getAllRouters();
+    $selectParts = [
+        'c.*',
+        $packagesTableExists ? 'p.name as package_name' : "'Tanpa Paket' as package_name",
+        $packagesTableExists ? 'p.price as package_price' : '0 as package_price',
+        $routersTableExists ? 'r.name as router_name' : "'' as router_name"
+    ];
+
+    $joinParts = [];
+    if ($packagesTableExists) {
+        $joinParts[] = 'LEFT JOIN packages p ON c.package_id = p.id';
+    }
+    if ($routersTableExists) {
+        $joinParts[] = 'LEFT JOIN routers r ON c.router_id = r.id';
+    }
+
+    $customers = fetchAll("
+        SELECT " . implode(', ', $selectParts) . "
+        FROM customers c 
+        " . implode("\n        ", $joinParts) . "
+        ORDER BY c.created_at DESC
+        LIMIT $perPage OFFSET $offset
+    ");
+} else {
+    $totalCustomers = 0;
+    $totalPages = 0;
+    $customers = [];
+}
+
+$packages = $packagesTableExists ? fetchAll("SELECT * FROM packages ORDER BY name") : [];
+$routers = $routersTableExists ? getAllRouters() : [];
 
 ob_start();
 ?>
@@ -129,7 +153,7 @@ ob_start();
             <i class="fas fa-check-circle"></i>
         </div>
         <div class="stat-info">
-            <h3><?php echo count(array_filter($customers, fn($c) => $c['status'] === 'active')); ?></h3>
+            <h3><?php echo count(array_filter($customers, function ($c) { return ($c['status'] ?? '') === 'active'; })); ?></h3>
             <p>Aktif</p>
         </div>
     </div>
@@ -139,7 +163,7 @@ ob_start();
             <i class="fas fa-ban"></i>
         </div>
         <div class="stat-info">
-            <h3><?php echo count(array_filter($customers, fn($c) => $c['status'] === 'isolated')); ?></h3>
+            <h3><?php echo count(array_filter($customers, function ($c) { return ($c['status'] ?? '') === 'isolated'; })); ?></h3>
             <p>Isolir</p>
         </div>
     </div>
