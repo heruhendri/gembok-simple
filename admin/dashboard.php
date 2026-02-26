@@ -106,6 +106,15 @@ $pppoeActive = mikrotikGetActiveSessions();
 $pppoeActiveCount = is_array($pppoeActive) ? count($pppoeActive) : 0;
 $interfaces = mikrotikGetInterfaces();
 
+// Sales Stats
+$salesStats = [
+    'totalSales' => fetchOne("SELECT COUNT(*) as total FROM sales_users")['total'] ?? 0,
+    'todayVouchers' => fetchOne("SELECT COUNT(*) as total FROM hotspot_sales WHERE DATE(created_at) = CURDATE()")['total'] ?? 0,
+    'monthVouchers' => fetchOne("SELECT COUNT(*) as total FROM hotspot_sales WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')")['total'] ?? 0,
+    'todayRevenue' => fetchOne("SELECT SUM(selling_price) as total FROM hotspot_sales WHERE DATE(created_at) = CURDATE()")['total'] ?? 0,
+    'todayProfit' => fetchOne("SELECT SUM(selling_price - price) as total FROM hotspot_sales WHERE DATE(created_at) = CURDATE()")['total'] ?? 0,
+];
+
 ob_start();
 ?>
 
@@ -237,6 +246,33 @@ ob_start();
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
         <div style="font-size: 1.5rem; font-weight: 800; margin-bottom: 5px;"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
         <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-wallet"></i> Total Pendapatan Bulan Ini</div>
+    </div>
+</div>
+
+<!-- Sales Portal Summary -->
+<div class="card mb-4" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-wallet"></i> Ringkasan Sales Portal</h3>
+    </div>
+    <div style="padding: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border-left: 4px solid var(--neon-cyan);">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">Total Sales User</div>
+                <div style="font-size: 1.5rem; font-weight: bold;"><?php echo $salesStats['totalSales']; ?></div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border-left: 4px solid var(--neon-purple);">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">Voucher Terjual (Hari Ini)</div>
+                <div style="font-size: 1.5rem; font-weight: bold;"><?php echo $salesStats['todayVouchers']; ?></div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border-left: 4px solid var(--neon-green);">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">Omzet (Hari Ini)</div>
+                <div style="font-size: 1.5rem; font-weight: bold;"><?php echo formatCurrency($salesStats['todayRevenue']); ?></div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border-left: 4px solid var(--neon-orange);">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">Profit (Hari Ini)</div>
+                <div style="font-size: 1.5rem; font-weight: bold;"><?php echo formatCurrency($salesStats['todayProfit']); ?></div>
+            </div>
+        </div>
     </div>
 </div>
 

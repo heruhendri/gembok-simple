@@ -20,7 +20,13 @@ try {
         'totalInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices")['total'] ?? 0,
         'paidInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices WHERE status = 'paid'")['total'] ?? 0,
         'pendingInvoices' => fetchOne("SELECT COUNT(*) as total FROM invoices WHERE status = 'unpaid'")['total'] ?? 0,
-        'totalRevenue' => fetchOne("SELECT SUM(amount) as total FROM invoices WHERE status = 'paid'")['total'] ?? 0,
+        'totalRevenue' => fetchOne("
+            SELECT SUM(amount) as total 
+            FROM invoices 
+            WHERE status = 'paid' 
+            AND paid_at IS NOT NULL
+            AND DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+        ")['total'] ?? 0,
     ];
 
     // Get recent invoices

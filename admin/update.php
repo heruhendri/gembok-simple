@@ -4,14 +4,16 @@ requireAdminLogin();
 
 $pageTitle = 'Update Aplikasi';
 
-$currentVersion = APP_VERSION;
-$localVersion = $currentVersion;
+// Get local version primarily from version.txt
+$localVersion = '1.0.0'; // Fallback
 $localVersionFile = dirname(__DIR__) . '/version.txt';
 if (file_exists($localVersionFile)) {
     $fileVersion = trim(file_get_contents($localVersionFile));
     if ($fileVersion !== '') {
         $localVersion = $fileVersion;
     }
+} elseif (defined('APP_VERSION')) {
+    $localVersion = APP_VERSION;
 }
 
 $remoteVersion = null;
@@ -22,19 +24,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'check') {
-        $remoteUrl = defined('GEMBOK_UPDATE_VERSION_URL') ? GEMBOK_UPDATE_VERSION_URL : '';
+        // Fallback URL if not defined in config
+        $defaultUpdateUrl = 'https://raw.githubusercontent.com/alijaya0601/gembok-simple2/main/version.txt';
+        $remoteUrl = defined('GEMBOK_UPDATE_VERSION_URL') ? GEMBOK_UPDATE_VERSION_URL : $defaultUpdateUrl;
+        
         if ($remoteUrl === '') {
             $statusMessage = 'URL versi update belum dikonfigurasi.';
             $statusType = 'error';
         } else {
+            // Disable SSL verification for simplicity (or configure cacert.pem properly)
             $context = stream_context_create([
                 'http' => [
-                    'timeout' => 10
+                    'timeout' => 10,
+                    'header' => "User-Agent: GEMBOK-Updater\r\n"
+                ],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
                 ]
             ]);
+            
             $remoteContent = @file_get_contents($remoteUrl, false, $context);
             if ($remoteContent === false) {
-                $statusMessage = 'Gagal mengambil versi dari server update.';
+                $error = error_get_last();
+                $statusMessage = 'Gagal mengambil versi dari server update. Error: ' . ($error['message'] ?? 'Unknown');
                 $statusType = 'error';
             } else {
                 $remoteVersion = trim($remoteContent);
@@ -42,11 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $statusMessage = 'File versi di server update kosong.';
                     $statusType = 'error';
                 } else {
-                    if ($remoteVersion === $localVersion) {
+                    // Compare versions
+                    if (version_compare($localVersion, $remoteVersion, '>=')) {
                         $statusMessage = 'Versi aplikasi sudah terbaru (' . htmlspecialchars($localVersion) . ').';
                         $statusType = 'success';
                     } else {
-                        $statusMessage = 'Tersedia versi baru: ' . htmlspecialchars($remoteVersion) . ' (saat ini: ' . htmlspecialchars($localVersion) . ').';
+                        $statusMessage = 'Tersedia versi baru: <strong>' . htmlspecialchars($remoteVersion) . '</strong> (saat ini: ' . htmlspecialchars($localVersion) . ').';
                         $statusType = 'info';
                     }
                 }
@@ -56,8 +70,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $output = [];
         $returnVar = 0;
         $projectRoot = realpath(dirname(__DIR__));
+        
+        // 1. Run git pull
         $cmd = 'cd ' . escapeshellarg($projectRoot) . ' && git pull 2>&1';
         exec($cmd, $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            // 2. Run Database Migration if successful
+            require_once '../includes/db.php';
+            try {
+                $pdo = getDB();
+                
+                // --- Sales Portal Migration ---
+                
+                // Add bill_discount to sales_users
+                try {
+                    $pdo->query("SELECT bill_discount FROM sales_users LIMIT 1");
+                } catch (Exception $e) {
+                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN bill_discount DECIMAL(15,2) DEFAULT 2000 AFTER status");
+                    $output[] = "Added column: bill_discount to sales_users";
+                }
+                
+                // Fix sales_transactions type
+                try {
+                    $stmt = $pdo->query("SHOW COLUMNS FROM sales_transactions LIKE 'type'");
+                    $col = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if (strpos($col['Type'], 'enum') !== false) {
+                        $pdo->exec("ALTER TABLE sales_transactions MODIFY type VARCHAR(50) NOT NULL");
+                        $output[] = "Updated column type: sales_transactions.type to VARCHAR";
+                    }
+                } catch (Exception $e) {
+                    // Table might not exist yet, create it
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS sales_transactions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        sales_user_id INT NOT NULL,
+                        type VARCHAR(50) NOT NULL,
+                        amount DECIMAL(15,2) NOT NULL,
+                        description TEXT,
+                        related_username VARCHAR(100),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (sales_user_id) REFERENCES sales_users(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                    $output[] = "Created table: sales_transactions";
+                }
+                
+                // Ensure updated_at exists
+                $tables = ['sales_transactions', 'hotspot_sales', 'sales_users'];
+                foreach($tables as $tbl) {
+                    try {
+                        $pdo->query("SELECT updated_at FROM $tbl LIMIT 1");
+                    } catch (Exception $e) {
+                        $pdo->exec("ALTER TABLE $tbl ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+                        $output[] = "Added column: updated_at to $tbl";
+                    }
+                }
+                
+                $output[] = "Database migration completed.";
+                
+            } catch (Exception $e) {
+                $output[] = "Database migration failed: " . $e->getMessage();
+            }
+        }
+        
         $statusMessage = implode("\n", $output);
         $statusType = $returnVar === 0 ? 'success' : 'error';
     }
@@ -71,8 +146,7 @@ ob_start();
         <h3 class="card-title"><i class="fas fa-sync-alt"></i> Update Aplikasi</h3>
     </div>
     <div class="card-body">
-        <p>APP_VERSION (config): <strong><?php echo htmlspecialchars($currentVersion); ?></strong></p>
-        <p>Version.txt (local): <strong><?php echo htmlspecialchars($localVersion); ?></strong></p>
+        <p>Versi Terpasang: <strong><?php echo htmlspecialchars($localVersion); ?></strong></p>
         
         <?php if ($statusMessage): ?>
             <div class="alert alert-<?php echo $statusType === 'success' ? 'success' : ($statusType === 'error' ? 'error' : 'info'); ?>" style="white-space: pre-line;">

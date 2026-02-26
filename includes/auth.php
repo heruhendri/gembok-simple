@@ -3,6 +3,19 @@
  * Authentication Functions
  */
 
+if (!file_exists(__DIR__ . '/config.php')) {
+    // Detect if we are in a subdirectory
+    $installPath = 'install.php';
+    if (file_exists('../install.php')) {
+        $installPath = '../install.php';
+    } elseif (file_exists('../../install.php')) {
+        $installPath = '../../install.php';
+    }
+    
+    header("Location: $installPath");
+    exit;
+}
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -170,4 +183,57 @@ function generateCustomerPortalPassword($customerId) {
     $password = generateRandomString(8);
     setCustomerPortalPassword($customerId, $password);
     return $password;
+}
+
+// Sales Authentication
+function salesLogin($username, $password) {
+    $sales = fetchOne("SELECT * FROM sales_users WHERE username = ?", [$username]);
+    
+    if (!$sales) {
+        return false;
+    }
+    
+    if ($sales['status'] !== 'active') {
+        return 'inactive';
+    }
+    
+    if (password_verify($password, $sales['password'])) {
+        $_SESSION['sales'] = [
+            'id' => $sales['id'],
+            'name' => $sales['name'],
+            'username' => $sales['username'],
+            'deposit_balance' => $sales['deposit_balance'],
+            'logged_in' => true,
+            'login_time' => time()
+        ];
+        
+        logActivity('SALES_LOGIN', "Username: {$username}");
+        return true;
+    }
+    
+    return false;
+}
+
+function salesLogout() {
+    logActivity('SALES_LOGOUT', "Username: " . ($_SESSION['sales']['username'] ?? 'unknown'));
+    
+    unset($_SESSION['sales']);
+    session_destroy();
+    
+    redirect(APP_URL . '/sales/login.php');
+}
+
+function isSalesLoggedIn() {
+    return isset($_SESSION['sales']) && isset($_SESSION['sales']['logged_in']) && $_SESSION['sales']['logged_in'] === true;
+}
+
+function requireSalesLogin() {
+    if (!isSalesLoggedIn()) {
+        setFlash('error', 'Silakan login terlebih dahulu');
+        redirect(APP_URL . '/sales/login.php');
+    }
+}
+
+function getSalesUser($id) {
+    return fetchOne("SELECT * FROM sales_users WHERE id = ?", [$id]);
 }

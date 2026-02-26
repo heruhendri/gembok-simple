@@ -637,12 +637,18 @@ if (isset($_GET['switch_router'])) {
 
         /* Responsive */
         @media (max-width: 768px) {
-            body {
-                padding-bottom: 70px; /* Space for bottom nav */
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 1000;
+                transition: transform 0.3s ease;
             }
 
-            .sidebar {
-                display: none; /* Hide sidebar on mobile */
+            .sidebar.active {
+                transform: translateX(0);
             }
 
             .main-content {
@@ -660,11 +666,6 @@ if (isset($_GET['switch_router'])) {
 
             .header-actions {
                 gap: 10px;
-            }
-            
-            /* Hide menu toggle since we use bottom nav */
-            .menu-toggle {
-                display: none !important;
             }
 
             .stats-grid {
@@ -701,46 +702,6 @@ if (isset($_GET['switch_router'])) {
             .btn-sm {
                 padding: 4px 8px;
                 font-size: 0.75rem;
-            }
-            
-            /* Bottom Navigation */
-            .bottom-nav {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                background: var(--bg-sidebar);
-                display: flex;
-                justify-content: space-around;
-                align-items: center;
-                padding: 10px 0;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                z-index: 1000;
-                border-top: 1px solid var(--border-color);
-            }
-
-            .nav-item {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-decoration: none;
-                color: var(--text-secondary);
-                font-size: 0.75rem;
-                gap: 4px;
-                transition: all 0.3s;
-            }
-
-            .nav-item i {
-                font-size: 1.2rem;
-                margin-bottom: 2px;
-            }
-
-            .nav-item.active {
-                color: var(--neon-cyan);
-            }
-            
-            .nav-item.active i {
-                transform: translateY(-2px);
             }
         }
 
@@ -789,11 +750,6 @@ if (isset($_GET['switch_router'])) {
             border-color: var(--neon-cyan);
             color: var(--neon-cyan);
         }
-        @media (max-width: 768px) {
-            .bottom-nav {
-                display: flex !important;
-            }
-        }
     </style>
     <script>
         // Apply theme immediately to prevent flash
@@ -804,203 +760,143 @@ if (isset($_GET['switch_router'])) {
             });
         }
     </script>
+    <style>
+        /* Mobile Bottom Nav */
+        .bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            z-index: 2000;
+            padding: 10px 0;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .bottom-nav-item i {
+            font-size: 1.2rem;
+        }
+
+        .bottom-nav-item.active {
+            color: var(--neon-cyan);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+                padding-bottom: 80px; /* Space for bottom nav */
+            }
+            .menu-toggle {
+                display: block;
+            }
+            .bottom-nav {
+                display: flex;
+            }
+            /* Hide desktop sidebar specific items if needed */
+        }
+    </style>
 </head>
-
 <body>
-    <?php if (isAdminLoggedIn()): ?>
-        <!-- Mobile Bottom Navigation -->
-        <div class="bottom-nav d-md-none" style="display: none;">
-            <a href="<?php echo APP_URL; ?>/admin/dashboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?>">
-                <i class="fas fa-home"></i>
-                <span>Home</span>
-            </a>
-            
-            <a href="<?php echo APP_URL; ?>/admin/customers.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'customers.php' ? 'active' : ''; ?>">
-                <i class="fas fa-users"></i>
-                <span>Pelanggan</span>
-            </a>
-            
-            <a href="<?php echo APP_URL; ?>/admin/pay.php" class="nav-item <?php echo (basename($_SERVER['PHP_SELF']) === 'pay.php' || basename($_SERVER['PHP_SELF']) === 'pay_process.php') ? 'active' : ''; ?>">
-                <i class="fas fa-money-bill-wave"></i>
-                <span>Bayar</span>
-            </a>
-            
-            <a href="<?php echo APP_URL; ?>/admin/invoices.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'invoices.php' ? 'active' : ''; ?>">
-                <i class="fas fa-file-invoice"></i>
-                <span>Invoice</span>
-            </a>
-            
-            <a href="<?php echo APP_URL; ?>/admin/logout.php" class="nav-item">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </a>
-        </div>
-
+    <?php if (isSalesLoggedIn()): ?>
         <!-- Sidebar Overlay for mobile -->
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-        <!-- Admin Sidebar -->
+        <!-- Sales Sidebar (Desktop) -->
         <div class="sidebar" id="mainSidebar">
             <div class="sidebar-header">
-                <i class="fas fa-network-wired" style="font-size: 1.5rem; color: var(--neon-cyan);"></i>
-                <span class="sidebar-logo">GEMBOK</span>
+                <i class="fas fa-wallet" style="font-size: 1.5rem; color: var(--neon-cyan);"></i>
+                <span class="sidebar-logo">SALES PORTAL</span>
             </div>
 
             <div class="sidebar-nav">
-                <a href="<?php echo APP_URL; ?>/admin/dashboard.php"
+                <a href="<?php echo APP_URL; ?>/sales/dashboard.php"
                     class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?>">
                     <i class="fas fa-tachometer-alt"></i>
                     <span>Dashboard</span>
                 </a>
 
-                <a href="<?php echo APP_URL; ?>/admin/customers.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'customers.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-users"></i>
-                    <span>Pelanggan</span>
+                <a href="<?php echo APP_URL; ?>/sales/vouchers.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'vouchers.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-ticket-alt"></i>
+                    <span>Buat Voucher</span>
                 </a>
 
-                <a href="<?php echo APP_URL; ?>/admin/packages.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'packages.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-box"></i>
-                    <span>Paket Layanan</span>
+                <a href="<?php echo APP_URL; ?>/sales/pay.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'pay.php' || basename($_SERVER['PHP_SELF']) === 'pay_process.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Bayar Tagihan</span>
                 </a>
 
-                <a href="<?php echo APP_URL; ?>/admin/invoices.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'invoices.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-file-invoice"></i>
-                    <span>Invoice</span>
+                <a href="<?php echo APP_URL; ?>/sales/history.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'history.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-history"></i>
+                    <span>Riwayat</span>
                 </a>
 
-                <div class="menu-item <?php echo (strpos(basename($_SERVER['PHP_SELF']), 'sales') !== false) ? 'active' : ''; ?>"
-                    onclick="toggleSubmenu(this)">
-                    <i class="fas fa-user-tie"></i>
-                    <span>Sales / Agen</span>
-                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 0.7rem;"></i>
-                </div>
-                <div class="submenu"
-                    style="<?php echo (strpos(basename($_SERVER['PHP_SELF']), 'sales') !== false) ? 'display: block;' : 'display: none;'; ?> background: var(--bg-submenu);">
-                    <a href="<?php echo APP_URL; ?>/admin/sales-users.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'sales-users.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-users"></i> <span>Data Sales</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/sales-report.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'sales-report.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-chart-line"></i> <span>Laporan Penjualan</span>
-                    </a>
-                </div>
-
-                <div class="menu-item <?php echo (basename($_SERVER['PHP_SELF']) === 'mikrotik.php') ? 'active' : ''; ?>"
-                    onclick="toggleSubmenu(this)">
-                    <i class="fas fa-network-wired"></i>
-                    <span>PPPOE</span>
-                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 0.7rem;"></i>
-                </div>
-                <div class="submenu"
-                    style="<?php echo (basename($_SERVER['PHP_SELF']) === 'mikrotik.php') ? 'display: block;' : 'display: none;'; ?> background: var(--bg-submenu);">
-                    <a href="<?php echo APP_URL; ?>/admin/mikrotik.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'mikrotik.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-server"></i> <span>Data MikroTik</span>
-                    </a>
-                </div>
-
-                <div class="menu-item <?php echo strpos(basename($_SERVER['PHP_SELF']), 'hotspot') !== false ? 'active' : ''; ?>"
-                    onclick="toggleSubmenu(this)">
-                    <i class="fas fa-wifi"></i>
-                    <span>Hotspot</span>
-                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 0.7rem;"></i>
-                </div>
-                <div class="submenu"
-                    style="<?php echo strpos(basename($_SERVER['PHP_SELF']), 'hotspot') !== false ? 'display: block;' : 'display: none;'; ?> background: var(--bg-submenu);">
-                    <a href="<?php echo APP_URL; ?>/admin/hotspot-user.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hotspot-user.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-users"></i> <span>Hotspot Users</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/hotspot-active.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hotspot-active.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-signal"></i> <span>Hotspot Active</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/hotspot-profile.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hotspot-profile.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-id-card"></i> <span>Hotspot Profiles</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/hotspot-cookies.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hotspot-cookies.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-cookie-bite"></i> <span>Hotspot Cookies</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/hotspot-scheduler.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hotspot-scheduler.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-clock"></i> <span>Schedulers</span>
-                    </a>
-                    <a href="<?php echo APP_URL; ?>/admin/export-rsc.php"
-                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'export-rsc.php' ? 'active' : ''; ?>"
-                        style="padding-left: 45px; font-size: 0.9rem;">
-                        <i class="fas fa-file-export"></i> <span>Export RSC</span>
-                    </a>
-                </div>
-
-                <a href="<?php echo APP_URL; ?>/admin/genieacs.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'genieacs.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-satellite-dish"></i>
-                    <span>GenieACS</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/map.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'map.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-map-marked-alt"></i>
-                    <span>Peta</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/voucher-editor.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'voucher-editor.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-magic"></i>
-                    <span>Template Voucher</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/trouble.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'trouble.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Gangguan</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/settings.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'settings.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-cog"></i>
-                    <span>Settings</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/update.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'update.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-sync-alt"></i>
-                    <span>Update</span>
-                </a>
-
-                <a href="<?php echo APP_URL; ?>/admin/routers.php"
-                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'routers.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-server"></i>
-                    <span>Router Management</span>
+                <a href="<?php echo APP_URL; ?>/sales/profile.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'profile.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Profile</span>
                 </a>
 
                 <div style="margin-top: 20px; border-top: 1px solid var(--border-color);"></div>
 
-                <a href="<?php echo APP_URL; ?>/admin/logout.php" class="menu-item">
+                <a href="<?php echo APP_URL; ?>/sales/logout.php" class="menu-item">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Logout</span>
                 </a>
             </div>
         </div>
+
+        <!-- Bottom Navbar (Mobile) -->
+        <div class="bottom-nav">
+            <a href="<?php echo APP_URL; ?>/sales/dashboard.php" class="bottom-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?>">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Home</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/sales/vouchers.php" class="bottom-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'vouchers.php' ? 'active' : ''; ?>">
+                <i class="fas fa-ticket-alt"></i>
+                <span>Voucher</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/sales/pay.php" class="bottom-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'pay.php' || basename($_SERVER['PHP_SELF']) === 'pay_process.php' ? 'active' : ''; ?>">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>Bayar</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/sales/profile.php" class="bottom-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'profile.php' ? 'active' : ''; ?>">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/sales/logout.php" class="bottom-nav-item">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     <?php endif; ?>
 
     <!-- Main Content -->
     <div class="main-content">
-        <?php if (isAdminLoggedIn()): ?>
+        <?php if (isSalesLoggedIn()): ?>
             <div class="header">
                 <div class="header-title">
                     <h1><?php echo htmlspecialchars($pageTitle); ?></h1>
@@ -1011,30 +907,20 @@ if (isset($_GET['switch_router'])) {
                         <i class="fas fa-moon" id="themeIcon"></i>
                     </button>
 
-                    <!-- Router Switcher -->
-                    <?php if (count($allRouters) > 1): ?>
-                    <div class="router-switcher" style="margin-right: 15px;">
-                        <select onchange="window.location.href='?switch_router=' + this.value" 
-                                style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; cursor: pointer;">
-                            <?php foreach ($allRouters as $r): ?>
-                                <option value="<?php echo $r['id']; ?>" <?php echo $currentRouter['id'] == $r['id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($r['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <?php endif; ?>
-
                     <button class="menu-toggle" onclick="toggleSidebar()"
                         style="display: none; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.5rem;">
                         <i class="fas fa-bars"></i>
                     </button>
                     <span style="color: var(--text-secondary);">
                         <i class="fas fa-user-circle"></i>
-                        <?php echo htmlspecialchars(getCurrentAdmin()['username']); ?>
+                        <?php echo htmlspecialchars($_SESSION['sales']['name'] ?? 'Sales'); ?>
                     </span>
-                    <span class="badge badge-info" style="margin-left: 10px;">
-                        <i class="fas fa-server"></i> <?php echo htmlspecialchars($currentRouter['name'] ?? 'Default'); ?>
+                    <span class="badge badge-success" style="margin-left: 10px; background: var(--neon-green); color: #000;">
+                        <?php 
+                        // Refresh balance
+                        $me = getSalesUser($_SESSION['sales']['id']);
+                        echo formatCurrency($me['deposit_balance']); 
+                        ?>
                     </span>
                 </div>
             </div>

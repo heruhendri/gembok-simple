@@ -1,5 +1,10 @@
 <?php
 
+// Ensure config is loaded
+if (file_exists(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+}
+
 function getMikrotikSettings($routerId = null)
 {
     // If routerId is provided, always fetch that specific router
@@ -1611,7 +1616,7 @@ function mikrotikGetParentQueues()
 }
 
 // Record Hotspot Sale in Database
-function recordHotspotSale($username, $profile, $price, $sellingPrice, $prefix = '')
+function recordHotspotSale($username, $profile, $price, $sellingPrice, $prefix = '', $salesUserId = null)
 {
     $data = [
         'username' => sanitize($username),
@@ -1619,6 +1624,7 @@ function recordHotspotSale($username, $profile, $price, $sellingPrice, $prefix =
         'price' => (float) $price,
         'selling_price' => (float) $sellingPrice,
         'prefix' => sanitize($prefix),
+        'sales_user_id' => $salesUserId,
         'created_at' => date('Y-m-d H:i:s')
     ];
 

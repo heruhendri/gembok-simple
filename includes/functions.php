@@ -173,10 +173,10 @@ function generateRandomString($length = 10, $type = 'mixed')
         case 'up':
             $x = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             break;
-        case 'alphanumeric':
         case 'mixed':
             $x = '23456789abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ';
             break; // Avoid ambiguous chars
+        case 'alphanumeric':
         default:
             $x = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
             break;
@@ -184,7 +184,7 @@ function generateRandomString($length = 10, $type = 'mixed')
     
     $str = '';
     for ($i = 0; $i < $length; $i++) {
-        $str .= $x[rand(0, strlen($x) - 1)];
+        $str .= $x[mt_rand(0, strlen($x) - 1)];
     }
     return $str;
 }

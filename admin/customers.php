@@ -143,7 +143,7 @@ ob_start();
             <i class="fas fa-users"></i>
         </div>
         <div class="stat-info">
-            <h3><?php echo count($customers); ?></h3>
+            <h3><?php echo (int) $totalCustomers; ?></h3>
             <p>Total Pelanggan</p>
         </div>
     </div>
@@ -179,7 +179,7 @@ ob_start();
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 100%;">
             <div class="form-group">
                 <label class="form-label">Nama Pelanggan</label>
                 <input type="text" name="name" class="form-control" required placeholder="Nama Lengkap">
@@ -190,11 +190,11 @@ ob_start();
                 <input type="text" name="phone" class="form-control" required placeholder="08xxxxxxxxxx">
             </div>
             
-            <div class="form-group">
+            <div class="form-group" style="grid-column: 1 / -1;">
                 <label class="form-label">Username PPPoE</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" name="pppoe_username" id="pppoe_username_input" class="form-control" required placeholder="Pilih atau ketik username" style="flex: 1;">
-                    <button type="button" class="btn btn-secondary" onclick="openPppoeUserModal()">Pilih dari MikroTik</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" name="pppoe_username" id="pppoe_username_input" class="form-control" required placeholder="Pilih atau ketik username" style="flex: 1 1 200px; min-width: 0;">
+                    <button type="button" class="btn btn-secondary" onclick="openPppoeUserModal()" style="flex: 0 0 auto; white-space: nowrap;">Pilih dari MikroTik</button>
                 </div>
                 <small style="color: var(--text-muted);">Pilih username PPPoE dari user MikroTik untuk menghindari salah input</small>
             </div>
@@ -312,7 +312,10 @@ ob_start();
                         <span class="badge badge-info">Tgl <?php echo $c['isolation_date']; ?></span>
                     </td>
                     <td data-label="Aksi">
-                        <button class="btn btn-secondary btn-sm" onclick="editCustomer(<?php echo $c['id']; ?>)">
+                        <a href="pay_process.php?id=<?php echo $c['id']; ?>" class="btn btn-success btn-sm" title="Bayar Tagihan">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </a>
+                        <button class="btn btn-secondary btn-sm" onclick="editCustomer(<?php echo htmlspecialchars(json_encode($c)); ?>)" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
                         <?php if ($c['status'] === 'isolated'): ?>
@@ -358,8 +361,8 @@ ob_start();
 </div>
         
 <!-- PPPoE User Modal -->
-<div id="pppoeUserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
-    <div class="card" style="width: 700px; max-width: 90%; margin: 2rem; max-height: 80vh; overflow-y: auto;">
+<div id="pppoeUserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000;">
+    <div class="card" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 360px; max-height: 80vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h3 style="margin: 0; color: var(--neon-cyan);">
                 <i class="fas fa-network-wired"></i> Pilih Username PPPoE
@@ -633,49 +636,52 @@ document.getElementById('searchCustomer').addEventListener('input', function(e) 
 });
 
 // Edit customer
-function editCustomer(id) {
-    // Show loading or something if needed
-    fetch(`../api/customers.php?id=${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const customer = data.data;
-                
-                document.getElementById('edit_customer_id').value = customer.id;
-                document.getElementById('edit_name').value = customer.name;
-                document.getElementById('edit_phone').value = customer.phone;
-                document.getElementById('edit_pppoe_username').value = customer.pppoe_username;
-                document.getElementById('edit_package_id').value = customer.package_id;
-                document.getElementById('edit_router_id').value = customer.router_id || 0;
-                document.getElementById('edit_isolation_date').value = customer.isolation_date;
-                document.getElementById('edit_address').value = customer.address || '';
-                document.getElementById('edit_lat').value = customer.lat || '';
-                document.getElementById('edit_lng').value = customer.lng || '';
-                
-                // Show modal
-                document.getElementById('editCustomerModal').style.display = 'flex';
-                
-                // Initialize map if needed and set view
-                setTimeout(() => {
-                    initEditMap();
-                    editMap.invalidateSize();
-                    
-                    if (customer.lat && customer.lng) {
-                        const latlng = [customer.lat, customer.lng];
-                        editMap.setView(latlng, 15);
-                        
-                        if (editMarker) editMap.removeLayer(editMarker);
-                        editMarker = L.marker(latlng).addTo(editMap);
-                    }
-                }, 100);
-            } else {
-                alert('Gagal mengambil data pelanggan: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Terjadi kesalahan saat mengambil data pelanggan');
-        });
+function editCustomer(customer) {
+    // If id is passed (number or string), fetch data (backward compatibility)
+    if (typeof customer !== 'object') {
+        fetch(`../api/customers.php?id=${customer}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editCustomer(data.data);
+                } else {
+                    alert('Gagal mengambil data pelanggan: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat mengambil data pelanggan');
+            });
+        return;
+    }
+
+    document.getElementById('edit_customer_id').value = customer.id;
+    document.getElementById('edit_name').value = customer.name;
+    document.getElementById('edit_phone').value = customer.phone;
+    document.getElementById('edit_pppoe_username').value = customer.pppoe_username;
+    document.getElementById('edit_package_id').value = customer.package_id;
+    document.getElementById('edit_router_id').value = customer.router_id || 0;
+    document.getElementById('edit_isolation_date').value = customer.isolation_date;
+    document.getElementById('edit_address').value = customer.address || '';
+    document.getElementById('edit_lat').value = customer.lat || '';
+    document.getElementById('edit_lng').value = customer.lng || '';
+    
+    // Show modal
+    document.getElementById('editCustomerModal').style.display = 'flex';
+    
+    // Initialize map if needed and set view
+    setTimeout(() => {
+        initEditMap();
+        editMap.invalidateSize();
+        
+        if (customer.lat && customer.lng) {
+            const latlng = [customer.lat, customer.lng];
+            editMap.setView(latlng, 15);
+            
+            if (editMarker) editMap.removeLayer(editMarker);
+            editMarker = L.marker(latlng).addTo(editMap);
+        }
+    }, 100);
 }
 
 function closeEditModal() {
