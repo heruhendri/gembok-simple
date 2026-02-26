@@ -388,6 +388,9 @@ function createDatabaseTables() {
         password VARCHAR(255) NOT NULL,
         deposit_balance DECIMAL(15,2) DEFAULT 0,
         status ENUM('active', 'inactive') DEFAULT 'active',
+        voucher_mode VARCHAR(20) DEFAULT 'mix',
+        voucher_length INT DEFAULT 6,
+        voucher_type VARCHAR(20) DEFAULT 'upp',
         bill_discount DECIMAL(15,2) DEFAULT 2000,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
