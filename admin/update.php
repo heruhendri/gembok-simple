@@ -126,6 +126,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
+                // Ensure voucher columns exist on sales_users
+                try {
+                    $pdo->query("SELECT voucher_mode FROM sales_users LIMIT 1");
+                } catch (Exception $e) {
+                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_mode VARCHAR(20) DEFAULT 'mix' AFTER status");
+                    $output[] = "Added column: voucher_mode to sales_users";
+                }
+                try {
+                    $pdo->query("SELECT voucher_length FROM sales_users LIMIT 1");
+                } catch (Exception $e) {
+                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_length INT DEFAULT 6 AFTER voucher_mode");
+                    $output[] = "Added column: voucher_length to sales_users";
+                }
+                try {
+                    $pdo->query("SELECT voucher_type FROM sales_users LIMIT 1");
+                } catch (Exception $e) {
+                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_type VARCHAR(20) DEFAULT 'upp' AFTER voucher_length");
+                    $output[] = "Added column: voucher_type to sales_users";
+                }
+                
                 $output[] = "Database migration completed.";
                 
             } catch (Exception $e) {
