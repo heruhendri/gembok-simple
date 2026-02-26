@@ -178,6 +178,12 @@ $pageTitle = 'Login Sales';
                 <i class="fas fa-sign-in-alt"></i> Login
             </button>
         </form>
+
+        <div style="text-align: center; margin-top: 25px;">
+            <a href="../index.php" style="color: #666; text-decoration: none; font-size: 0.9rem; transition: color 0.3s;" onmouseover="this.style.color='#00f5ff'" onmouseout="this.style.color='#666'">
+                <i class="fas fa-arrow-left"></i> Kembali ke Beranda
+            </a>
+        </div>
     </div>
 </body>
 </html>
