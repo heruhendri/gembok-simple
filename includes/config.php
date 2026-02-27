@@ -22,16 +22,7 @@ if (php_sapi_name() !== 'cli' && isset($_SERVER['HTTP_HOST'])) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     // Base directory detection
     $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
-    
-    // Clean up known subdirectories to find root
-    $dirsToRemove = ['/admin', '/api', '/portal', '/cron', '/webhooks', '/install_steps', '/includes', '/sales', '/templates'];
-    
-    foreach ($dirsToRemove as $dir) {
-        if (strpos($scriptDir, $dir) !== false) {
-            $scriptDir = str_replace($dir, '', $scriptDir);
-        }
-    }
-    
+    $scriptDir = preg_replace('#/(admin|api|portal|cron|webhooks|install_steps|includes|sales|templates)$#', '', $scriptDir);
     $scriptDir = rtrim($scriptDir, '/');
     define('APP_URL', $protocol . '://' . $_SERVER['HTTP_HOST'] . $scriptDir);
 } else {

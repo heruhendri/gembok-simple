@@ -23,7 +23,9 @@ function getDB() {
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
         } catch (PDOException $e) {
-            error_log("Database Connection Error: " . $e->getMessage());
+            $logFile = __DIR__ . '/../logs/db_error.log';
+            $message = "[" . date('Y-m-d H:i:s') . "] Connection Error: " . $e->getMessage() . "\n";
+            file_put_contents($logFile, $message, FILE_APPEND);
             die("Maaf, terjadi kesalahan koneksi database. Silakan coba beberapa saat lagi.");
         }
     }
