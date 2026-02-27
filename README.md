@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/alijayanet/gembok-simple/main/assets/sim4.png" alt="Gembok Dashboard" width="100%">
+  <img src="https://raw.githubusercontent.com/alijayanet/gembok-simple/main/assets/demo-dashboard.png" alt="Gembok Dashboard" width="100%">
 </p>
 
 ---
@@ -82,7 +82,7 @@ http://your-domain.com/install.php
 ## 🎨 Admin Dashboard Preview
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/alijayanet/gembok-simple/main/assets/sim5.png" alt="Admin Dashboard" width="800">
+  <img src="https://raw.githubusercontent.com/alijayanet/gembok-simple/main/assets/admin-dashboard-preview.png" alt="Admin Dashboard" width="800">
 </p>
 
 ### Dashboard Features:

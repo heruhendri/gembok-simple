@@ -165,7 +165,7 @@ define('APP_NAME', 'GEMBOK');
 if (php_sapi_name() !== 'cli' && isset(\$_SERVER['HTTP_HOST'])) {
     \$protocol = (!empty(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     \$scriptDir = str_replace('\\\\', '/', dirname(\$_SERVER['SCRIPT_NAME']));
-    \$scriptDir = preg_replace('#/(admin|api|portal|cron|webhooks|install_steps|includes)$#', '', \$scriptDir);
+    \$scriptDir = preg_replace('#/(admin|api|portal|cron|webhooks|install_steps|includes|sales|templates)$#', '', \$scriptDir);
     \$scriptDir = rtrim(\$scriptDir, '/');
     define('APP_URL', \$protocol . '://' . \$_SERVER['HTTP_HOST'] . \$scriptDir);
 } else {
@@ -328,6 +328,8 @@ function createDatabaseTables() {
         description TEXT,
         status ENUM('pending', 'in_progress', 'resolved') DEFAULT 'pending',
         priority ENUM('low', 'medium', 'high') DEFAULT 'medium',
+        notes TEXT,
+        resolved_at DATETIME,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
