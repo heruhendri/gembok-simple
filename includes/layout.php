@@ -885,6 +885,11 @@ if (isset($_GET['switch_router'])) {
                         style="padding-left: 45px; font-size: 0.9rem;">
                         <i class="fas fa-chart-line"></i> <span>Laporan Penjualan</span>
                     </a>
+                    <a href="<?php echo APP_URL; ?>/admin/sales-history.php"
+                        class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'sales-history.php' ? 'active' : ''; ?>"
+                        style="padding-left: 45px; font-size: 0.9rem;">
+                        <i class="fas fa-history"></i> <span>Riwayat Transaksi</span>
+                    </a>
                 </div>
 
                 <div class="menu-item <?php echo (basename($_SERVER['PHP_SELF']) === 'mikrotik.php') ? 'active' : ''; ?>"
