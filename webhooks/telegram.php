@@ -10,13 +10,7 @@ require_once '../includes/payment.php';
 header('Content-Type: application/json');
 
 // Helper to get settings from database
-function getSetting($key, $default = '') {
-    if (defined($key)) {
-        return constant($key);
-    }
-    $row = fetchOne("SELECT setting_value FROM settings WHERE setting_key = ?", [$key]);
-    return $row ? $row['setting_value'] : $default;
-}
+// Redundant getSetting removed as it is already in includes/functions.php
 
 try {
     // Get raw POST data

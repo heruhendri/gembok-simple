@@ -10,17 +10,16 @@ require_once '../includes/payment.php';
 header('Content-Type: application/json');
 
 // Helper to get settings from database
-function getSetting($key, $default = '') {
-    if (defined($key)) {
-        return constant($key);
-    }
-    $row = fetchOne("SELECT setting_value FROM settings WHERE setting_key = ?", [$key]);
-    return $row ? $row['setting_value'] : $default;
-}
+// Redundant getSetting removed as it is already in includes/functions.php
 
 try {
     // Get raw POST data
     $json = file_get_contents('php://input');
+    
+    // Debug: Log incoming payload
+    $logDir = __DIR__ . '/../logs/';
+    if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+    file_put_contents($logDir . 'whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] PAYLOAD: " . $json . "\n", FILE_APPEND);
     
     logActivity('WHATSAPP_WEBHOOK', "Received webhook");
     
@@ -105,6 +104,8 @@ function handleMessageReceived($data) {
     $from = $payload['from'];
     $text = $payload['text'];
     
+    file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] PROCESSED SENDER: $from, TEXT: $text\n", FILE_APPEND);
+    
     if ($from === '' || $text === '') {
         return false;
     }
@@ -181,10 +182,11 @@ function normalizeWhatsAppPhone($phone) {
 
 function isWhatsAppAdmin($phone) {
     $admin = getSetting('WHATSAPP_ADMIN_NUMBER', '');
-    if ($admin === '') {
-        return false;
-    }
-    return normalizeWhatsAppPhone($phone) === normalizeWhatsAppPhone($admin);
+    $is_admin = (!empty($admin) && normalizeWhatsAppPhone($phone) === normalizeWhatsAppPhone($admin));
+    
+    file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] VERIFY ADMIN: Phone=$phone, AdminSet=$admin, RESULT=" . ($is_admin ? 'YES' : 'NO') . "\n", FILE_APPEND);
+    
+    return $is_admin;
 }
 
 function sendWhatsAppResponse($phone, $message) {
