@@ -56,6 +56,11 @@ ob_start();
                         <i class="fas fa-chart-line"></i>
                         <span>Laporan Sales</span>
                     </a>
+
+                    <a href="sales-history.php" class="menu-grid-item">
+                        <i class="fas fa-history"></i>
+                        <span>Riwayat Transaksi</span>
+                    </a>
                     
                     <hr style="width: 100%; border-color: var(--border-color); margin: 10px 0;">
                     
