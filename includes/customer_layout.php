@@ -599,6 +599,76 @@ ob_start();
                 align-items: stretch;
             }
         }
+        
+        /* Mobile Bottom Navigation */
+        .mobile-bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(18, 18, 26, 0.85); /* background-secondary with transparency */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            z-index: 2000;
+            padding-bottom: env(safe-area-inset-bottom, 0); /* Support for iPhone notch safe area */
+        }
+
+        .mobile-nav-inner {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 65px;
+        }
+
+        .mobile-nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            gap: 4px;
+            height: 100%;
+            transition: all 0.3s;
+        }
+
+        .mobile-nav-item i {
+            font-size: 1.25rem;
+            transition: transform 0.3s;
+        }
+
+        .mobile-nav-item span {
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .mobile-nav-item.active {
+            color: var(--neon-cyan);
+        }
+
+        .mobile-nav-item.active i {
+            transform: translateY(-2px);
+            text-shadow: var(--shadow-neon);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-bottom-nav {
+                display: block;
+            }
+
+            /* Hide the top hamburger menu since we use bottom nav now */
+            .header-actions .menu-toggle {
+                display: none !important;
+            }
+
+            /* Prevent content from hiding behind the bottom navbar */
+            body {
+                padding-bottom: 80px; 
+            }
+        }
     </style>
 </head>
 <body>
@@ -628,6 +698,32 @@ ob_start();
             </a>
         </div>
     </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+        <div class="mobile-nav-inner">
+            <a href="dashboard.php" class="mobile-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?>">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Beranda</span>
+            </a>
+            <a href="dashboard.php#wifi-settings" class="mobile-nav-item">
+                <i class="fas fa-wifi"></i>
+                <span>WiFi</span>
+            </a>
+            <a href="dashboard.php#lapor-gangguan" class="mobile-nav-item">
+                <i class="fas fa-ticket-alt"></i>
+                <span>Lapor</span>
+            </a>
+            <a href="payment.php" class="mobile-nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'payment.php' ? 'active' : ''; ?>">
+                <i class="fas fa-credit-card"></i>
+                <span>Tagihan</span>
+            </a>
+            <a href="logout.php" class="mobile-nav-item">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Keluar</span>
+            </a>
+        </div>
+    </nav>
 
     <!-- Main Content -->
     <div class="main-content">

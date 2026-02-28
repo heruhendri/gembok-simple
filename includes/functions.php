@@ -662,7 +662,8 @@ function genieacsGetDeviceInfo($serial)
         'ssid' => null,
         'wifi_password' => null,
         'ip_address' => null,
-        'mac_address' => null
+        'mac_address' => null,
+        'total_associations' => null
     ];
 
     // Determine online status (last inform within 5 minutes)
@@ -724,6 +725,9 @@ function genieacsGetDeviceInfo($serial)
     $info['tx_power'] =
         genieacsGetValue($device, 'InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.TxPower') ??
         genieacsGetValue($device, 'Device.Optical.Interface.1.TXPower');
+
+    // Connected Devices / Total Associations (SSID 1 Only)
+    $info['total_associations'] = genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations');
 
     return $info;
 }
