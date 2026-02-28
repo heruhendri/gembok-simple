@@ -27,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'router_id' => (int)($_POST['router_id'] ?? 0),
                     'isolation_date' => (int)$_POST['isolation_date'],
                     'address' => sanitize($_POST['address']),
-                    'lat' => $_POST['lat'] ?? null,
-                    'lng' => $_POST['lng'] ?? null,
+                    'lat' => (!isset($_POST['lat']) || $_POST['lat'] === '') ? null : $_POST['lat'],
+                    'lng' => (!isset($_POST['lng']) || $_POST['lng'] === '') ? null : $_POST['lng'],
                     'portal_password' => password_hash('1234', PASSWORD_DEFAULT),
                     'created_at' => date('Y-m-d H:i:s')
                 ];
@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'router_id' => (int)($_POST['router_id'] ?? 0),
                     'isolation_date' => (int)$_POST['isolation_date'],
                     'address' => sanitize($_POST['address']),
-                    'lat' => $_POST['lat'] ?? null,
-                    'lng' => $_POST['lng'] ?? null,
+                    'lat' => (!isset($_POST['lat']) || $_POST['lat'] === '') ? null : $_POST['lat'],
+                    'lng' => (!isset($_POST['lng']) || $_POST['lng'] === '') ? null : $_POST['lng'],
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
                 
