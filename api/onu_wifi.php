@@ -50,7 +50,7 @@ try {
             echo json_encode(['success' => false, 'message' => 'Device not found for PPPoE username: ' . $pppoeUsername]);
             exit;
         }
-        $serial = $device['DeviceID']['_SerialNumber'] ?? $pppoeUsername; // Fallback to username if serial not found
+        $serial = $device['_id'] ?? $device['DeviceID']['_SerialNumber'] ?? $pppoeUsername; // Fallback to _id first, then serial, then username
     }
 
     // Validate SSID
