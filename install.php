@@ -478,6 +478,7 @@ function insertDefaultData() {
 
     $siteSettings = [
         ['hero_title', 'Internet Cepat <br>Tanpa Batas'],
+        ['theme_color', 'neon'],
         ['hero_description', 'Nikmati koneksi internet fiber optic super cepat, stabil, dan unlimited untuk kebutuhan rumah maupun bisnis Anda. Gabung sekarang!'],
         ['contact_phone', '+62 812-3456-7890'],
         ['contact_email', 'info@gembok.net'],

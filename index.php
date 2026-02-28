@@ -48,9 +48,12 @@ $s_fb = getSiteSetting('social_facebook', '#');
 $s_ig = getSiteSetting('social_instagram', '#');
 $s_tw = getSiteSetting('social_twitter', '#');
 $s_yt = getSiteSetting('social_youtube', '#');
+
+// Theme settings
+$themeColor = getSiteSetting('theme_color', 'neon');
 ?>
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" <?php echo $themeColor !== 'neon' ? 'data-theme="' . htmlspecialchars($themeColor) . '"' : ''; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,6 +62,7 @@ $s_yt = getSiteSetting('social_youtube', '#');
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Default Theme (Neon) */
             --primary: #00f5ff;
             --secondary: #bf00ff;
             --dark: #0a0a12;
@@ -66,6 +70,37 @@ $s_yt = getSiteSetting('social_youtube', '#');
             --gray: #b0b0c0;
             --bg-dark: #0f0f1a;
             --bg-card: #1a1a2e;
+        }
+
+        /* Theme Variations */
+        [data-theme="ocean"] {
+            --primary: #0099ff;
+            --secondary: #00d4ff;
+            --bg-card: #121e2d;
+        }
+
+        [data-theme="nature"] {
+            --primary: #00ff88;
+            --secondary: #00cc6a;
+            --bg-card: #122d1e;
+        }
+
+        [data-theme="sunset"] {
+            --primary: #ff6b35;
+            --secondary: #ff9f43;
+            --bg-card: #2d1a12;
+        }
+
+        [data-theme="royal"] {
+            --primary: #a742f5;
+            --secondary: #d633ff;
+            --bg-card: #22122d;
+        }
+
+        [data-theme="crimson"] {
+            --primary: #ff2e63;
+            --secondary: #ff0055;
+            --bg-card: #2d1218;
         }
 
         * {
@@ -800,8 +835,8 @@ $s_yt = getSiteSetting('social_youtube', '#');
             const navLinks = document.getElementById('navLinks');
             navLinks.classList.toggle('active');
         }
-        
-        // Smooth scroll
+
+        // Smooth Scrolling
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
