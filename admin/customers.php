@@ -56,6 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $payload['created_at'] = date('Y-m-d H:i:s');
                                 insert('onu_locations', $payload);
                             }
+                            
+                            // Synchronize PPPoE Username to GenieACS if applicable
+                            if (!empty($serial)) {
+                                genieacsSetParameter($serial, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username', $serial);
+                                genieacsSetParameter($serial, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password', '1234'); // Default password assumption or pull from DB
+                            }
                         } catch (Exception $e) {
                             // Do not block customer creation if ONU sync fails
                             logError('ONU sync (add customer) failed: ' . $e->getMessage());
@@ -109,6 +115,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $payload['created_at'] = date('Y-m-d H:i:s');
                                     insert('onu_locations', $payload);
                                 }
+
+                                // Synchronize PPPoE Username to GenieACS if applicable
+                                genieacsSetParameter($serial, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username', $serial);
                             }
                         } catch (Exception $e) {
                             logError('ONU sync (edit customer) failed: ' . $e->getMessage());

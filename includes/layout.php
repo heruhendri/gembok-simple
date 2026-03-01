@@ -44,7 +44,7 @@ if (isset($_GET['switch_router'])) {
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
 
     <!-- Font Awesome -->
@@ -55,11 +55,11 @@ if (isset($_GET['switch_router'])) {
 
     <style>
         :root {
-            /* Dark Neon Theme (Default) */
+            /* Dark Neon Theme (Premium) */
             --bg-primary: #0a0a0f;
             --bg-secondary: #12121a;
-            --bg-card: rgba(20, 20, 35, 0.8);
-            --bg-sidebar: #0d0d15;
+            --bg-card: rgba(20, 20, 35, 0.6);
+            --bg-sidebar: rgba(13, 13, 21, 0.85);
             --neon-cyan: #00f5ff;
             --neon-purple: #bf00ff;
             --neon-pink: #ff00aa;
@@ -70,34 +70,37 @@ if (isset($_GET['switch_router'])) {
             --gradient-success: linear-gradient(135deg, #00ff88 0%, #00d4aa 100%);
             --gradient-warning: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
             --text-primary: #ffffff;
-            --text-secondary: rgba(255, 255, 255, 0.6);
+            --text-secondary: rgba(255, 255, 255, 0.75);
             --text-muted: rgba(255, 255, 255, 0.4);
             --border-color: rgba(255, 255, 255, 0.08);
-            --border-glow: rgba(0, 245, 255, 0.3);
-            --shadow-neon: 0 0 20px rgba(0, 245, 255, 0.3);
-            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --border-glow: rgba(0, 245, 255, 0.4);
+            --shadow-neon: 0 0 15px rgba(0, 245, 255, 0.2);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.2);
             --sidebar-width: 260px;
             --sidebar-collapsed: 70px;
             --bg-input: rgba(255, 255, 255, 0.05);
-            --bg-submenu: rgba(0, 0, 0, 0.2);
+            --bg-submenu: rgba(0, 0, 0, 0.3);
+            --backdrop-blur: blur(12px);
+            --border-radius-md: 14px;
+            --border-radius-lg: 18px;
         }
 
         body.light-theme {
-            --bg-primary: #f0f2f5;
+            --bg-primary: #f8f9fa;
             --bg-secondary: #ffffff;
-            --bg-card: rgba(255, 255, 255, 0.9);
-            --bg-sidebar: #ffffff;
-            --neon-cyan: #007bff;
-            --neon-purple: #6f42c1;
-            --text-primary: #1a1a1b;
-            --text-secondary: #4a4a4b;
-            --text-muted: #6a6a6b;
-            --border-color: rgba(0, 0, 0, 0.1);
-            --border-glow: rgba(0, 123, 255, 0.2);
-            --shadow-neon: 0 4px 12px rgba(0, 123, 255, 0.1);
-            --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.05);
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-sidebar: rgba(255, 255, 255, 0.95);
+            --neon-cyan: #0066ff;
+            --neon-purple: #7b2cbf;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --text-muted: #9ca3af;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --border-glow: rgba(0, 102, 255, 0.3);
+            --shadow-neon: 0 4px 15px rgba(0, 102, 255, 0.15);
+            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
             --bg-input: #ffffff;
-            --bg-submenu: #f8f9fa;
+            --bg-submenu: rgba(243, 244, 246, 0.8);
         }
 
         * {
@@ -107,11 +110,27 @@ if (isset($_GET['switch_router'])) {
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.5);
         }
 
         a {
@@ -132,9 +151,11 @@ if (isset($_GET['switch_router'])) {
             width: var(--sidebar-width);
             height: 100vh;
             background: var(--bg-sidebar);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
             border-right: 1px solid var(--border-color);
             z-index: 1000;
-            transition: all 0.3s;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
         }
@@ -168,10 +189,13 @@ if (isset($_GET['switch_router'])) {
             align-items: center;
             gap: 12px;
             padding: 12px 20px;
+            margin: 4px 12px;
+            border-radius: 10px;
             color: var(--text-secondary);
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             cursor: pointer;
             border-left: 3px solid transparent;
+            font-weight: 500;
         }
 
         .menu-item:hover,
@@ -179,6 +203,7 @@ if (isset($_GET['switch_router'])) {
             background: rgba(0, 245, 255, 0.1);
             color: var(--neon-cyan);
             border-left-color: var(--neon-cyan);
+            transform: translateX(4px);
         }
 
         .menu-item i {
@@ -199,15 +224,19 @@ if (isset($_GET['switch_router'])) {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
-            padding: 20px;
+            padding: 18px 24px;
             background: var(--bg-card);
-            border-radius: 12px;
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border-radius: var(--border-radius-lg);
             border: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
 
         .header-title h1 {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
         .header-actions {
@@ -228,11 +257,18 @@ if (isset($_GET['switch_router'])) {
         /* Cards */
         .card {
             background: var(--bg-card);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: var(--border-radius-md);
+            padding: 24px;
+            margin-bottom: 24px;
             box-shadow: var(--shadow-card);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
 
         .card-header {
@@ -241,7 +277,7 @@ if (isset($_GET['switch_router'])) {
             align-items: center;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* Softer border */
         }
 
         .card-title {
@@ -328,28 +364,31 @@ if (isset($_GET['switch_router'])) {
 
         .stat-card {
             background: var(--bg-card);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: var(--border-radius-md);
+            padding: 24px;
             display: flex;
             align-items: center;
-            gap: 15px;
-            transition: all 0.3s;
+            gap: 18px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-8px);
             box-shadow: var(--shadow-neon);
+            border-color: rgba(0, 245, 255, 0.3);
         }
 
         .stat-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.6rem;
         }
 
         .stat-icon.cyan {
@@ -457,19 +496,20 @@ if (isset($_GET['switch_router'])) {
 
         .form-control {
             width: 100%;
-            padding: 12px;
+            padding: 14px 16px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 12px;
             color: var(--text-primary);
             font-size: 1rem;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
 
         .form-control:focus {
             outline: none;
             border-color: var(--neon-cyan);
-            box-shadow: 0 0 0 2px var(--border-glow);
+            box-shadow: 0 0 0 4px rgba(0, 245, 255, 0.15);
+            background: rgba(255, 255, 255, 0.08); /* slightly lighter on focus */
         }
 
         select option {
@@ -767,10 +807,17 @@ if (isset($_GET['switch_router'])) {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
-        .sidebar-overlay.active { display: block; }
+        .sidebar-overlay.active { 
+            display: block; 
+            opacity: 1;
+        }
 
         .theme-toggle-btn {
             background: none;

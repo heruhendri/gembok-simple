@@ -122,18 +122,18 @@ ob_start();
 
 <!-- Router Info Bar -->
 <div
-    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
+    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
     <!-- Date/Time & Uptime -->
     <div class="card" style="margin-bottom: 0;">
-        <div style="padding: 15px; display: flex; align-items: center; gap: 15px;">
+        <div style="padding: 10px; display: flex; align-items: center; gap: 18px;">
             <div
-                style="width: 45px; height: 45px; border-radius: 10px; background: linear-gradient(135deg, var(--neon-cyan), #0088cc); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <i class="fas fa-calendar-alt" style="color: #fff; font-size: 1.2rem;"></i>
+                style="width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, var(--neon-cyan), #0088cc); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 15px rgba(0, 245, 255, 0.2);">
+                <i class="fas fa-calendar-alt" style="color: #fff; font-size: 1.4rem;"></i>
             </div>
             <div>
-                <div style="color: var(--text-primary); font-weight: 600;"><?php echo date('d M Y H:i:s'); ?></div>
-                <div style="color: var(--text-muted); font-size: 0.85rem;">Uptime:
-                    <?php echo htmlspecialchars($routerResource['uptime']); ?>
+                <div style="color: var(--text-primary); font-weight: 700; font-size: 1.1rem;"><?php echo date('d M Y H:i:s'); ?></div>
+                <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 2px;">Uptime:
+                    <span style="color: var(--neon-cyan); font-weight: 500;"><?php echo htmlspecialchars($routerResource['uptime']); ?></span>
                 </div>
             </div>
         </div>
@@ -180,72 +180,70 @@ ob_start();
 
 <!-- Hotspot Stats (4 colored boxes like Mikhmon v3) -->
 <div
-    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">
+    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
     <a href="hotspot-user.php" style="text-decoration: none;">
-        <div style="background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 12px; padding: 20px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;"
-            onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(59,130,246,0.4)';"
-            onmouseout="this.style.transform=''; this.style.boxShadow='';">
-            <div style="font-size: 2.2rem; font-weight: 800; color: #fff;"><?php echo $hotspotActiveCount; ?></div>
-            <div style="color: rgba(255,255,255,0.85); font-size: 0.85rem; margin-top: 5px;"><i
-                    class="fas fa-laptop"></i> Hotspot Active</div>
+        <div style="background: linear-gradient(135deg, #00f5ff, #0088cc); border-radius: 16px; padding: 24px; text-align: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; box-shadow: 0 4px 15px rgba(0, 245, 255, 0.15);"
+            onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 245, 255, 0.4)';"
+            onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 15px rgba(0, 245, 255, 0.15)';">
+            <div style="font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1;"><?php echo $hotspotActiveCount; ?></div>
+            <div style="color: rgba(255,255,255,0.9); font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-laptop" style="margin-right: 5px;"></i> Hotspot Active</div>
         </div>
     </a>
     <a href="hotspot-user.php" style="text-decoration: none;">
-        <div style="background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px; padding: 20px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;"
-            onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(34,197,94,0.4)';"
-            onmouseout="this.style.transform=''; this.style.boxShadow='';">
-            <div style="font-size: 2.2rem; font-weight: 800; color: #fff;"><?php echo $hotspotTotalUsers; ?></div>
-            <div style="color: rgba(255,255,255,0.85); font-size: 0.85rem; margin-top: 5px;"><i
-                    class="fas fa-users"></i> Hotspot Users</div>
+        <div style="background: linear-gradient(135deg, #00ff88, #00a859); border-radius: 16px; padding: 24px; text-align: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; box-shadow: 0 4px 15px rgba(0, 255, 136, 0.15);"
+            onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 255, 136, 0.4)';"
+            onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 15px rgba(0, 255, 136, 0.15)';">
+            <div style="font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1;"><?php echo $hotspotTotalUsers; ?></div>
+            <div style="color: rgba(255,255,255,0.9); font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-users" style="margin-right: 5px;"></i> Hotspot Users</div>
         </div>
     </a>
     <a href="mikrotik.php" style="text-decoration: none;">
-        <div style="background: linear-gradient(135deg, #eab308, #ca8a04); border-radius: 12px; padding: 20px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;"
-            onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(234,179,8,0.4)';"
-            onmouseout="this.style.transform=''; this.style.boxShadow='';">
-            <div style="font-size: 2.2rem; font-weight: 800; color: #fff;"><i class="fas fa-user-plus"></i></div>
-            <div style="color: rgba(255,255,255,0.85); font-size: 0.85rem; margin-top: 5px;">Add PPPoE</div>
+        <div style="background: linear-gradient(135deg, #bf00ff, #7a00a3); border-radius: 16px; padding: 24px; text-align: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; box-shadow: 0 4px 15px rgba(191, 0, 255, 0.15);"
+            onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(191, 0, 255, 0.4)';"
+            onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 15px rgba(191, 0, 255, 0.15)';">
+            <div style="font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1;"><i class="fas fa-network-wired"></i></div>
+            <div style="color: rgba(255,255,255,0.9); font-size: 0.95rem; margin-top: 10px; font-weight: 500;">Add PPPoE</div>
         </div>
     </a>
-    <a href="hotspot-user.php" style="text-decoration: none;">
-        <div style="background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 12px; padding: 20px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;"
-            onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(239,68,68,0.4)';"
-            onmouseout="this.style.transform=''; this.style.boxShadow='';">
-            <div style="font-size: 2.2rem; font-weight: 800; color: #fff;"><i class="fas fa-user-plus"></i></div>
-            <div style="color: rgba(255,255,255,0.85); font-size: 0.85rem; margin-top: 5px;">Generate</div>
+    <a href="voucher.php" style="text-decoration: none;">
+        <div style="background: linear-gradient(135deg, #ff00aa, #b30077); border-radius: 16px; padding: 24px; text-align: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; box-shadow: 0 4px 15px rgba(255, 0, 170, 0.15);"
+            onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(255, 0, 170, 0.4)';"
+            onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 15px rgba(255, 0, 170, 0.15)';">
+            <div style="font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1;"><i class="fas fa-ticket-alt"></i></div>
+            <div style="color: rgba(255,255,255,0.9); font-size: 0.95rem; margin-top: 10px; font-weight: 500;">Generate Voucher</div>
         </div>
     </a>
 </div>
 
 <!-- ISP Stats Grid (Mikhmon Style) -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
     <!-- Total Pelanggan -->
-    <div style="background: linear-gradient(135deg, #06b6d4, #0891b2); border-radius: 12px; padding: 20px; text-align: center; color: white; transition: transform 0.2s, box-shadow 0.2s;"
-         onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(6,182,212,0.4)';"
+    <div style="background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(0, 136, 204, 0.2)); border: 1px solid var(--neon-cyan); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+         onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 245, 255, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.2rem; font-weight: 800;"><?php echo $stats['totalCustomers']; ?></div>
-        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-users"></i> Total Pelanggan</div>
+        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-cyan);"><?php echo $stats['totalCustomers']; ?></div>
+        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-users" style="margin-right: 5px;"></i> Total Pelanggan</div>
     </div>
     <!-- PPPoE Active -->
-    <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-radius: 12px; padding: 20px; text-align: center; color: white; transition: transform 0.2s, box-shadow 0.2s;"
-         onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(139,92,246,0.4)';"
+    <div style="background: linear-gradient(135deg, rgba(191, 0, 255, 0.1), rgba(122, 0, 163, 0.2)); border: 1px solid var(--neon-purple); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+         onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(191, 0, 255, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.2rem; font-weight: 800;"><?php echo $pppoeActiveCount; ?></div>
-        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-network-wired"></i> PPPoE Active</div>
+        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-purple);"><?php echo $pppoeActiveCount; ?></div>
+        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-network-wired" style="margin-right: 5px;"></i> PPPoE Active</div>
     </div>
     <!-- Pelanggan Isolir -->
-    <div style="background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px; padding: 20px; text-align: center; color: white; transition: transform 0.2s, box-shadow 0.2s;"
-         onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(245,158,11,0.4)';"
+    <div style="background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(204, 85, 42, 0.2)); border: 1px solid var(--neon-orange); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+         onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(255, 107, 53, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.2rem; font-weight: 800;"><?php echo $stats['isolatedCustomers']; ?></div>
-        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-user-lock"></i> Pelanggan Isolir</div>
+        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-orange);"><?php echo $stats['isolatedCustomers']; ?></div>
+        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-user-lock" style="margin-right: 5px;"></i> Pelanggan Isolir</div>
     </div>
     <!-- Total Pendapatan Bulan Ini -->
-    <div style="background: linear-gradient(135deg, #ec4899, #db2777); border-radius: 12px; padding: 20px; text-align: center; color: white; transition: transform 0.2s, box-shadow 0.2s;"
-         onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(236,72,153,0.4)';"
+    <div style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 168, 89, 0.2)); border: 1px solid var(--neon-green); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+         onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 255, 136, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 1.5rem; font-weight: 800; margin-bottom: 5px;"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
-        <div style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;"><i class="fas fa-wallet"></i> Total Pendapatan Bulan Ini</div>
+        <div style="font-size: 1.8rem; font-weight: 800; margin-bottom: 5px; color: var(--neon-green);"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
+        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-wallet" style="margin-right: 5px;"></i> Total Pendapatan Bulan Ini</div>
     </div>
 </div>
 
@@ -277,14 +275,14 @@ ob_start();
 </div>
 
 <!-- Traffic Monitor + Hotspot Log (2-column layout) -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;" id="mikhmon-main-grid">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; margin-bottom: 24px;" id="mikhmon-main-grid">
     <!-- Traffic Monitor -->
     <div class="card" style="margin-bottom: 0;">
         <div class="card-header"
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <h3 class="card-title"><i class="fas fa-chart-area"></i> Traffic Monitor</h3>
             <select id="interfaceSelector" onchange="changeInterface(this.value)"
-                style="background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 10px; font-size: 0.85rem;">
+                class="form-control" style="width: auto; padding: 6px 12px;">
                 <?php foreach ($interfaces as $iface): ?>
                     <option value="<?php echo htmlspecialchars($iface['name'] ?? ''); ?>">
                         <?php echo htmlspecialchars($iface['name'] ?? ''); ?>
@@ -292,7 +290,7 @@ ob_start();
                 <?php endforeach; ?>
             </select>
         </div>
-        <div style="padding: 15px;">
+        <div>
             <canvas id="trafficChart" height="250"></canvas>
         </div>
     </div>
@@ -302,8 +300,8 @@ ob_start();
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-align-justify"></i> Hotspot Log</h3>
         </div>
-        <div style="padding: 10px; max-height: 380px; overflow-y: auto;" id="hotspotLogContainer">
-            <table class="table" style="font-size: 0.8rem;">
+        <div style="max-height: 290px; overflow-y: auto;" id="hotspotLogContainer">
+            <table class="data-table" style="font-size: 0.85rem;">
                 <thead>
                     <tr>
                         <th>Time</th>

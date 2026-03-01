@@ -19,28 +19,32 @@ $error = '';
 
 // Handle save
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'save') {
-        $filename = basename($_POST['filename']);
-        $content = $_POST['content'];
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+        $error = 'Invalid CSRF token.';
+    } else {
+        if ($_POST['action'] === 'save') {
+            $filename = basename($_POST['filename']);
+            $content = $_POST['content'];
 
-        if (empty($filename)) {
-            $error = 'Filename cannot be empty';
-        } else {
-            if (!str_ends_with($filename, '.php')) {
-                $filename .= '.php';
-            }
-
-            if (file_put_contents($templateDir . $filename, $content) !== false) {
-                $message = "Template '$filename' saved successfully.";
+            if (empty($filename)) {
+                $error = 'Filename cannot be empty';
             } else {
-                $error = "Failed to save template '$filename'.";
+                if (!str_ends_with($filename, '.php')) {
+                    $filename .= '.php';
+                }
+
+                if (file_put_contents($templateDir . $filename, $content) !== false) {
+                    $message = "Template '$filename' saved successfully.";
+                } else {
+                    $error = "Failed to save template '$filename'.";
+                }
             }
-        }
-    } elseif ($_POST['action'] === 'delete') {
-        $filename = basename($_POST['filename']);
-        if ($filename !== 'default.php' && file_exists($templateDir . $filename)) {
-            unlink($templateDir . $filename);
-            $message = "Template '$filename' deleted.";
+        } elseif ($_POST['action'] === 'delete') {
+            $filename = basename($_POST['filename']);
+            if ($filename !== 'default.php' && file_exists($templateDir . $filename)) {
+                unlink($templateDir . $filename);
+                $message = "Template '$filename' deleted.";
+            }
         }
     }
 }
@@ -69,6 +73,7 @@ ob_start();
                 </h3>
                 <?php if ($selectedTemplate !== 'default.php' && $selectedTemplate !== ''): ?>
                     <form method="POST" style="display: inline;" onsubmit="return confirm('Hapus template ini?');">
+                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="filename" value="<?php echo htmlspecialchars($selectedTemplate); ?>">
                         <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Delete</button>
@@ -88,6 +93,7 @@ ob_start();
                 <?php endif; ?>
 
                 <form method="POST" id="templateForm">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="action" value="save">
                     <div class="form-group">
                         <label>Pilih Template</label>

@@ -13,6 +13,12 @@ $technicians = fetchAll("SELECT * FROM technician_users WHERE status = 'active' 
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+        setFlash('error', 'Invalid CSRF token');
+        redirect('trouble.php');
+    }
+    
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
@@ -188,6 +194,7 @@ ob_start();
     </div>
     
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         <input type="hidden" name="action" value="add">
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -299,6 +306,7 @@ ob_start();
                                 </button>
                             <?php endif; ?>
                             <form method="POST" style="display: inline;" onsubmit="return confirm('Hapus tiket ini?');">
+                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="ticket_id" value="<?php echo $ticket['id']; ?>">
                                 <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
@@ -377,6 +385,7 @@ ob_start();
         </div>
         
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <input type="hidden" name="action" value="update_status">
             <input type="hidden" name="ticket_id" id="status_ticket_id">
             

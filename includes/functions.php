@@ -582,6 +582,30 @@ function genieacsGetDevice($serial)
         }
     }
 
+    // Attempt 4: Search by PPPoE Username (VirtualParameters.pppoeUsername)
+    // Since `customers.php` maps PPPoE Username to the `serial_number` column in the database,
+    // this acts as a vital fallback for finding online status on the map.
+    $query4 = json_encode(['VirtualParameters.pppoeUsername' => $serial]);
+    $url4 = rtrim($genieacs['url'], '/') . '/devices/?query=' . urlencode($query4);
+
+    $ch4 = curl_init($url4);
+    curl_setopt($ch4, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch4, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch4, CURLOPT_TIMEOUT, 10);
+    if (!empty($genieacs['username']) && !empty($genieacs['password'])) {
+        curl_setopt($ch4, CURLOPT_USERPWD, $genieacs['username'] . ':' . $genieacs['password']);
+    }
+
+    $response4 = curl_exec($ch4);
+    $httpCode4 = curl_getinfo($ch4, CURLINFO_HTTP_CODE);
+
+    if ($httpCode4 === 200) {
+        $devices = json_decode($response4, true);
+        if (is_array($devices) && count($devices) > 0) {
+            return $devices[0];
+        }
+    }
+
     return null;
 }
 

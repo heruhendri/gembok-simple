@@ -12,6 +12,12 @@ $pageTitle = 'Voucher Generator';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+    
     $action = $_POST['action'] ?? '';
     
     if ($action === 'generate') {
@@ -128,6 +134,7 @@ ob_start();
     </div>
     
     <form id="generateForm">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         <input type="hidden" name="action" value="generate">
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
