@@ -477,6 +477,14 @@ ob_start();
                         <button class="btn btn-secondary btn-sm" onclick="editCustomer(<?php echo htmlspecialchars(json_encode($c)); ?>)" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <form method="POST" style="display: inline;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus pelanggan ini? Data yang dihapus tidak dapat dikembalikan.');">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="customer_id" value="<?php echo $c['id']; ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                         <?php if ($c['status'] === 'isolated'): ?>
                             <form method="POST" style="display: inline;">
                                 <input type="hidden" name="action" value="unisolate">
