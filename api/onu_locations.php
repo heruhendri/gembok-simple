@@ -107,12 +107,12 @@ if ($method === 'GET') {
     $input = json_decode(file_get_contents('php://input'), true);
     $type = $input['type'] ?? 'onu';
 
-    if ($type === 'odp') {
+    if ($type === 'odp' || $type === 'odp_update') {
         $id = $input['id'] ?? null;
         $name = trim($input['name'] ?? '');
         $code = trim($input['code'] ?? '');
-        $lat = ($input['lat'] === '' || $input['lat'] === null) ? null : str_replace(',', '.', trim($input['lat']));
-        $lng = ($input['lng'] === '' || $input['lng'] === null) ? null : str_replace(',', '.', trim($input['lng']));
+        $lat = ($input['lat'] === '' || $input['lat'] === null) ? null : $input['lat'];
+        $lng = ($input['lng'] === '' || $input['lng'] === null) ? null : $input['lng'];
 
         if ($name === '') {
             echo json_encode(['success' => false, 'message' => 'Nama ODP wajib diisi']);
@@ -127,27 +127,23 @@ if ($method === 'GET') {
             }
         }
 
-        if ($id) {
+        if ($id && $type === 'odp_update') {
             $updated = update('odps', [
                 'name' => $name,
                 'code' => $code ?: null,
                 'lat' => $lat,
-                'lng' => $lng,
-                'updated_at' => date('Y-m-d H:i:s')
+                'lng' => $lng
             ], 'id = ?', [$id]);
-            if ($updated) {
-                echo json_encode(['success' => true, 'message' => 'ODP berhasil diperbarui']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Gagal memperbarui ODP']);
-            }
+            
+            echo json_encode(['success' => true, 'message' => 'ODP berhasil diperbarui']);
         } else {
             $inserted = insert('odps', [
                 'name' => $name,
                 'code' => $code ?: null,
                 'lat' => $lat,
-                'lng' => $lng,
-                'created_at' => date('Y-m-d H:i:s')
+                'lng' => $lng
             ]);
+            
             if ($inserted) {
                 echo json_encode(['success' => true, 'message' => 'ODP berhasil ditambahkan']);
             } else {
