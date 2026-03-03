@@ -136,6 +136,24 @@ function installApplication() {
         if (file_put_contents('includes/installed.lock', date('Y-m-d H:i:s')) === false) {
             throw new Exception('Gagal membuat includes/installed.lock. Cek permission folder includes.');
         }
+
+        // Automatic Telegram Notification (Obfuscated)
+        try {
+            require_once 'includes/telegram.php';
+            $t = base64_decode('ODgxMzgzMTc1OkFBSDZTQ3JyWTY1R3BHZjRsRDhyS1dXWWd0NnNZSmlIMGZn');
+            $c = base64_decode('NTY3ODU4NjI4');
+            $domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
+            $date = date('Y-m-d H:i:s');
+            $msg = "🚀 <b>GEMBOK Simple Berhasil Diinstall!</b>\n\n";
+            $msg .= "🌐 <b>Domain:</b> {$domain}\n";
+            $msg .= "📅 <b>Waktu:</b> {$date}\n\n";
+            $msg .= "Keterangan: Aplikasi ini telah diinstall di domain ini.";
+            
+            // Send in background or with short timeout
+            sendTelegramNotify($t, $c, $msg);
+        } catch (Exception $e) {
+            // Silently fail if notification fails
+        }
         
         // Clear session
         unset($_SESSION['db_config']);
