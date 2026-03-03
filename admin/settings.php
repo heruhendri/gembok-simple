@@ -146,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
                 $landingSettings = [
+                    'landing_template' => sanitize($_POST['landing_template']),
                     'hero_title' => $_POST['hero_title'],
                     'hero_description' => $_POST['hero_description'],
                     'contact_phone' => sanitize($_POST['contact_phone']),
@@ -389,6 +390,27 @@ ob_start();
         <div class="form-group">
             <label class="form-label">Alamat Lengkap</label>
             <textarea name="contact_address" class="form-control" rows="2"><?php echo htmlspecialchars($siteSettings['contact_address'] ?? 'Jakarta, Indonesia'); ?></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Template Landing Page</label>
+            <select name="landing_template" class="form-control">
+                <optgroup label="🎨 Classic">
+                    <option value="neon" <?php echo ($siteSettings['landing_template'] ?? 'neon') === 'neon' ? 'selected' : ''; ?>>Neon Dark (Default)</option>
+                    <option value="modern" <?php echo ($siteSettings['landing_template'] ?? '') === 'modern' ? 'selected' : ''; ?>>Modern Clean</option>
+                    <option value="corporate" <?php echo ($siteSettings['landing_template'] ?? '') === 'corporate' ? 'selected' : ''; ?>>Corporate Blue</option>
+                    <option value="minimal" <?php echo ($siteSettings['landing_template'] ?? '') === 'minimal' ? 'selected' : ''; ?>>Minimal Dark</option>
+                </optgroup>
+                <optgroup label="✨ Modern & Trending">
+                    <option value="glassmorphism" <?php echo ($siteSettings['landing_template'] ?? '') === 'glassmorphism' ? 'selected' : ''; ?>>Glassmorphism (Blur Effects)</option>
+                    <option value="neumorphism" <?php echo ($siteSettings['landing_template'] ?? '') === 'neumorphism' ? 'selected' : ''; ?>>Neumorphism (Soft UI)</option>
+                </optgroup>
+                <optgroup label="🚀 Ultra Modern">
+                    <option value="bento" <?php echo ($siteSettings['landing_template'] ?? '') === 'bento' ? 'selected' : ''; ?>>Bento Grid (Smooth Animations)</option>
+                    <option value="modern_ultra" <?php echo ($siteSettings['landing_template'] ?? '') === 'modern_ultra' ? 'selected' : ''; ?>>Modern Ultra (3D & Particles)</option>
+                </optgroup>
+            </select>
+            <small class="text-muted">Pilih tampilan landing page (index.php)</small>
         </div>
 
         <div class="form-group">
