@@ -32,13 +32,14 @@ try {
     $statusCode = $data['status_code'] ?? '';
 
     // Verify signature
-    if (!defined('MIDTRANS_API_KEY')) {
+    $midtransApiKey = defined('MIDTRANS_API_KEY') ? (string) MIDTRANS_API_KEY : '';
+    if ($midtransApiKey === '') {
         logError('Midtrans webhook: API Key not configured');
         echo json_encode(['success' => false, 'message' => 'Configuration error']);
         exit;
     }
 
-    $expectedSignature = hash('sha512', $orderId . $statusCode . $grossAmount . MIDTRANS_API_KEY);
+    $expectedSignature = hash('sha512', $orderId . $statusCode . $grossAmount . $midtransApiKey);
     
     if ($signatureKey !== $expectedSignature) {
         logError('Midtrans webhook: Invalid signature');
@@ -69,7 +70,11 @@ function handlePaidInvoice($invoiceNumber, $paymentData) {
     $invoice = fetchOne("SELECT * FROM invoices WHERE invoice_number = ?", [$invoiceNumber]);
     
     if (!$invoice) {
-        logError("Invoice not found: {$invoiceNumber}");
+        if (markPublicVoucherOrderPaid($invoiceNumber, 'midtrans', $paymentData)) {
+            logActivity('PUBLIC_VOUCHER_PAID', "Order: {$invoiceNumber}");
+            return;
+        }
+        logError("Invoice/order not found: {$invoiceNumber}");
         return;
     }
     
@@ -106,5 +111,9 @@ function handlePaidInvoice($invoiceNumber, $paymentData) {
 }
 
 function handleFailedInvoice($invoiceNumber, $status) {
+    if (markPublicVoucherOrderFailed($invoiceNumber, $status, ['transaction_status' => $status])) {
+        logActivity('PUBLIC_VOUCHER_FAILED', "Order: {$invoiceNumber}, Status: {$status}");
+        return;
+    }
     logActivity('INVOICE_FAILED', "Invoice: {$invoiceNumber}, Status: {$status}");
 }

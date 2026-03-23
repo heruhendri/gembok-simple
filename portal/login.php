@@ -20,11 +20,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $phone = $_POST['phone'] ?? '';
     $password = $_POST['password'] ?? '';
+    $throttleStatus = getLoginThrottleStatus('customer', $phone, 5, 900, 900);
+    if ($throttleStatus['blocked']) {
+        $retryAfter = max(1, (int) ceil($throttleStatus['retry_after'] / 60));
+        setFlash('error', 'Terlalu banyak percobaan login. Coba lagi dalam ' . $retryAfter . ' menit.');
+        redirect('login.php');
+    }
 
     if (customerLogin($phone, $password)) {
+        clearLoginFailures('customer', $phone);
         setFlash('success', 'Login berhasil! Selamat datang.');
         redirect('dashboard.php');
     } else {
+        addLoginFailure('customer', $phone, 5, 900, 900);
         setFlash('error', 'Nomor HP atau password salah!');
         redirect('login.php');
     }
@@ -42,6 +50,16 @@ ob_start();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?php echo htmlspecialchars($pageTitle . ' - ' . $appName); ?></title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0a0a12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Portal Pelanggan">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -289,6 +307,21 @@ ob_start();
         </div>
     </div>
 </div>
+
+<script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                })
+                .catch(function(error) {
+                    console.log('ServiceWorker registration failed: ', error);
+                });
+        });
+    }
+</script>
 
 <?php
 $content = ob_get_clean();

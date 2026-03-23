@@ -17,6 +17,7 @@ if ($customerSession && isset($customerSession['id'])) {
         // Keep login info that might not be in DB or different structure
         $customer['logged_in'] = true;
         $customer['login_time'] = $customerSession['login_time'] ?? time();
+            $customer['must_change_password'] = $customerSession['must_change_password'] ?? (isset($customer['portal_password']) && password_verify('1234', $customer['portal_password']));
         $_SESSION['customer'] = $customer;
     } else {
         $customer = $customerSession;
@@ -95,6 +96,19 @@ ob_start();
 ?>
 
 <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+    <?php if (!empty($customer['must_change_password'])): ?>
+    <div class="card" style="border: 1px solid rgba(255, 0, 0, 0.3);">
+        <h3 style="margin-bottom: 10px; color: #ff6b6b;">
+            <i class="fas fa-lock"></i> Wajib ganti password portal
+        </h3>
+        <p style="color: var(--text-secondary); margin: 0 0 12px 0;">
+            Demi keamanan akun, silakan ubah password portal Anda sebelum melanjutkan.
+        </p>
+        <button class="btn btn-warning" type="button" onclick="document.getElementById('portal-password-section')?.scrollIntoView({behavior:'smooth'});">
+            <i class="fas fa-key"></i> Ubah Password Sekarang
+        </button>
+    </div>
+    <?php endif; ?>
 
     <!-- Package Info -->
     <div class="card">
@@ -295,7 +309,7 @@ ob_start();
     <?php endif; ?>
 
     <!-- Account Settings -->
-    <div class="card">
+    <div class="card" id="portal-password-section">
         <h3 style="margin-bottom: 15px; color: var(--neon-cyan);">
             <i class="fas fa-user-cog"></i> Pengaturan Akun Portal
         </h3>
@@ -382,6 +396,7 @@ ob_start();
 
 <script>
 const customerPppoeUsername = '<?php echo $customer['pppoe_username']; ?>';
+const apiCsrfToken = '<?php echo generateCsrfToken(); ?>';
 
 function showAlert(message, type = 'success') {
     const modal = document.getElementById('alertModal');
@@ -407,10 +422,11 @@ function updateSsid() {
     
     fetch('<?php echo APP_URL; ?>/api/onu_wifi.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': apiCsrfToken },
         body: JSON.stringify({ 
             pppoe_username: customerPppoeUsername,
-            ssid: ssid 
+            ssid: ssid,
+            csrf_token: apiCsrfToken
         })
     })
     .then(response => response.json())
@@ -433,10 +449,11 @@ function updatePassword() {
     
     fetch('<?php echo APP_URL; ?>/api/onu_wifi.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': apiCsrfToken },
         body: JSON.stringify({ 
             pppoe_username: customerPppoeUsername,
-            password: password 
+            password: password,
+            csrf_token: apiCsrfToken
         })
     })
     .then(response => response.json())
@@ -464,8 +481,8 @@ function changePortalPassword() {
     
     fetch('<?php echo APP_URL; ?>/api/portal_password.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword })
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': apiCsrfToken },
+        body: JSON.stringify({ password: newPassword, csrf_token: apiCsrfToken })
     })
     .then(response => response.json())
     .then(data => {
@@ -511,10 +528,11 @@ function submitTicket() {
     
     fetch('<?php echo APP_URL; ?>/api/customer_trouble.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': apiCsrfToken },
         body: JSON.stringify({
             description: description,
-            priority: priority
+            priority: priority,
+            csrf_token: apiCsrfToken
         })
     })
     .then(response => response.json())

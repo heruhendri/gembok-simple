@@ -66,7 +66,11 @@ function handlePaidInvoice($invoiceNumber, $paymentData) {
     $invoice = fetchOne("SELECT * FROM invoices WHERE invoice_number = ?", [$invoiceNumber]);
     
     if (!$invoice) {
-        logError("Invoice not found: {$invoiceNumber}");
+        if (markPublicVoucherOrderPaid($invoiceNumber, 'tripay', $paymentData)) {
+            logActivity('PUBLIC_VOUCHER_PAID', "Order: {$invoiceNumber}");
+            return;
+        }
+        logError("Invoice/order not found: {$invoiceNumber}");
         return;
     }
     
@@ -103,5 +107,9 @@ function handlePaidInvoice($invoiceNumber, $paymentData) {
 }
 
 function handleFailedInvoice($invoiceNumber, $status) {
+    if (markPublicVoucherOrderFailed($invoiceNumber, $status, ['status' => $status])) {
+        logActivity('PUBLIC_VOUCHER_FAILED', "Order: {$invoiceNumber}, Status: {$status}");
+        return;
+    }
     logActivity('INVOICE_FAILED', "Invoice: {$invoiceNumber}, Status: {$status}");
 }

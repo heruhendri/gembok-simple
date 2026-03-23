@@ -109,6 +109,13 @@ function handleMessageReceived($data) {
     if ($from === '' || $text === '') {
         return false;
     }
+
+    // Anti-Loopback: Abaikan pesan yang berasal dari nomor pengirim bot sendiri
+    $botSender = normalizeWhatsAppPhone(getSetting('MPWA_SENDER', ''));
+    if ($botSender !== '' && $from === $botSender) {
+        file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] LOOPBACK DETECTED: Ignoring message from bot's own number ($from)\n", FILE_APPEND);
+        return true;
+    }
     
     handleIncomingWhatsApp($from, $text);
     return true;
@@ -167,30 +174,55 @@ function extractWhatsAppMessage($data) {
 }
 
 function normalizeWhatsAppPhone($phone) {
-    $phone = preg_replace('/[^0-9]/', '', (string)$phone);
-    if ($phone === '') {
+    if (empty($phone)) return '';
+    
+    // Penanganan khusus untuk LID Baileys atau format ID non-numerik lainnya
+    // Jika mengandung karakter '@', ':', atau bukan angka tapi bukan sekadar tanda '+' di depan, 
+    // anggap sebagai ID unik dan jangan dibersihkan secara agresif.
+    if (preg_match('/[@:]/', (string)$phone)) {
+        return trim((string)$phone);
+    }
+
+    $clean = preg_replace('/[^0-9]/', '', (string)$phone);
+    if ($clean === '') {
         return '';
     }
-    if (strpos($phone, '62') === 0) {
-        return $phone;
+    if (strpos($clean, '62') === 0) {
+        return $clean;
     }
-    if (strpos($phone, '0') === 0) {
-        return '62' . substr($phone, 1);
+    if (strpos($clean, '0') === 0) {
+        return '62' . substr($clean, 1);
     }
-    return $phone;
+    return $clean;
 }
 
 function isWhatsAppAdmin($phone) {
     $admin = getSetting('WHATSAPP_ADMIN_NUMBER', '');
-    $is_admin = (!empty($admin) && normalizeWhatsAppPhone($phone) === normalizeWhatsAppPhone($admin));
+    if (empty($admin)) return false;
+
+    $normalizedPhone = normalizeWhatsAppPhone($phone);
     
-    file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] VERIFY ADMIN: Phone=$phone, AdminSet=$admin, RESULT=" . ($is_admin ? 'YES' : 'NO') . "\n", FILE_APPEND);
+    // Cek apakah admin diatur menggunakan format LID/ID unik (mengandung karakter non-angka)
+    $isAdminLid = preg_match('/[^0-9+]/', $admin);
+    
+    if ($isAdminLid) {
+        // Jika admin di-setting sebagai LID, bandingkan secara persis (case insensitive)
+        $is_admin = (strtolower($normalizedPhone) === strtolower(trim($admin)));
+    } else {
+        // Jika admin numerik, gunakan normalisasi standar
+        $is_admin = ($normalizedPhone === normalizeWhatsAppPhone($admin));
+    }
+    
+    file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] VERIFY ADMIN: RequestID=$phone, NormalID=$normalizedPhone, AdminConfig=$admin, Result=" . ($is_admin ? 'YES' : 'NO') . "\n", FILE_APPEND);
     
     return $is_admin;
 }
 
 function sendWhatsAppResponse($phone, $message) {
-    return sendWhatsApp($phone, $message);
+    $success = sendWhatsApp($phone, $message);
+    $status = $success ? "SUCCESS" : "FAILED";
+    file_put_contents(__DIR__ . '/../logs/whatsapp_webhook.log', "[" . date('Y-m-d H:i:s') . "] SEND RESPONSE to $phone: $status\n", FILE_APPEND);
+    return $success;
 }
 
 function handleIncomingWhatsApp($from, $text) {

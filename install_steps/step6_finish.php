@@ -31,6 +31,7 @@
         <li>Pastikan database sudah dibuat di cPanel/phpMyAdmin</li>
         <li>Installer akan menghapus semua data di database yang sama</li>
         <li>Backup data penting sebelum melanjutkan</li>
+        <li>Installer akan mengirim domain & waktu instalasi untuk statistik pemakaian</li>
         <li>Setelah instalasi berhasil, hapus file install.sh dari server jika digunakan untuk instalasi agar tidak dijalankan ulang dan menghapus data yang sudah ada</li>
     </ul>
 </div>
