@@ -24,15 +24,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'check') {
-        // Fallback URL if not defined in config
-        $defaultUpdateUrl = 'https://raw.githubusercontent.com/alijayanet/gembok-simple/main/version.txt';
-        $remoteUrl = defined('GEMBOK_UPDATE_VERSION_URL') ? GEMBOK_UPDATE_VERSION_URL : $defaultUpdateUrl;
-        
-        if ($remoteUrl === '') {
+        $configuredUrl = defined('GEMBOK_UPDATE_VERSION_URL') ? (string) GEMBOK_UPDATE_VERSION_URL : '';
+        $configuredUrl = trim($configuredUrl, " \t\n\r\0\x0B`'\"");
+        $configuredUrl = str_replace('refs/heads/main', 'main', $configuredUrl);
+        $fallbackUrls = [
+            'https://raw.githubusercontent.com/alijayanet/gembok-simple/main/version.txt',
+            'https://raw.githubusercontent.com/alijayanet/gembok-simple/refs/heads/main/version.txt'
+        ];
+        $urlsToTry = [];
+        if ($configuredUrl !== '') {
+            $urlsToTry[] = $configuredUrl;
+        }
+        foreach ($fallbackUrls as $url) {
+            if (!in_array($url, $urlsToTry, true)) {
+                $urlsToTry[] = $url;
+            }
+        }
+        if (empty($urlsToTry)) {
             $statusMessage = 'URL versi update belum dikonfigurasi.';
             $statusType = 'error';
         } else {
-            // Disable SSL verification for simplicity (or configure cacert.pem properly)
             $context = stream_context_create([
                 'http' => [
                     'timeout' => 10,
@@ -43,19 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'verify_peer_name' => false
                 ]
             ]);
-            
-            $remoteContent = @file_get_contents($remoteUrl, false, $context);
-            if ($remoteContent === false) {
-                $error = error_get_last();
-                $statusMessage = 'Gagal mengambil versi dari server update. Error: ' . ($error['message'] ?? 'Unknown');
-                $statusType = 'error';
-            } else {
-                $remoteVersion = trim($remoteContent);
-                if ($remoteVersion === '') {
-                    $statusMessage = 'File versi di server update kosong.';
-                    $statusType = 'error';
-                } else {
-                    // Compare versions
+            $lastErrorMessage = 'Unknown';
+            foreach ($urlsToTry as $url) {
+                $remoteContent = @file_get_contents($url, false, $context);
+                if ($remoteContent !== false) {
+                    $remoteVersion = trim($remoteContent);
+                    if ($remoteVersion === '') {
+                        $lastErrorMessage = 'File versi kosong dari ' . $url;
+                        continue;
+                    }
                     if (version_compare($localVersion, $remoteVersion, '>=')) {
                         $statusMessage = 'Versi aplikasi sudah terbaru (' . htmlspecialchars($localVersion) . ').';
                         $statusType = 'success';
@@ -63,7 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $statusMessage = 'Tersedia versi baru: <strong>' . htmlspecialchars($remoteVersion) . '</strong> (saat ini: ' . htmlspecialchars($localVersion) . ').';
                         $statusType = 'info';
                     }
+                    break;
                 }
+                $error = error_get_last();
+                $lastErrorMessage = $error['message'] ?? 'Unknown';
+            }
+            if ($statusMessage === '') {
+                $statusMessage = 'Gagal mengambil versi dari server update. Error terakhir: ' . $lastErrorMessage;
+                $statusType = 'error';
             }
         }
     } elseif ($action === 'update') {
