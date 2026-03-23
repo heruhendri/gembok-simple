@@ -95,6 +95,11 @@ ob_start();
                         <i class="fas fa-magic"></i>
                         <span>Template Voucher</span>
                     </a>
+
+                    <a href="voucher-orders.php" class="menu-grid-item">
+                        <i class="fas fa-receipt"></i>
+                        <span>Order Voucher</span>
+                    </a>
                     
                     <a href="map.php" class="menu-grid-item">
                         <i class="fas fa-map-marked-alt"></i>

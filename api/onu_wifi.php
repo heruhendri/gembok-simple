@@ -43,6 +43,9 @@ try {
     }
 
     $input = json_decode(file_get_contents('php://input'), true);
+    if (isCustomerLoggedIn()) {
+        requireApiCsrfToken($input);
+    }
 
     $pppoeUsername = $input['pppoe_username'] ?? '';
     $serial = $input['serial'] ?? '';  // Keep for backward compatibility

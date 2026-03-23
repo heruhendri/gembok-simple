@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // Handle POST request (create ticket)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
+    requireApiCsrfToken($input);
     
     $description = trim($input['description'] ?? '');
     $priority = trim($input['priority'] ?? 'medium');

@@ -22,6 +22,21 @@ require_once __DIR__ . '/functions.php';
 
 // Start session if not started
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.cookie_httponly', '1');
+    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    }
     session_start();
 }
 
@@ -34,6 +49,7 @@ function adminLogin($username, $password) {
     }
     
     if (password_verify($password, $admin['password'])) {
+        session_regenerate_id(true);
         $_SESSION['admin'] = [
             'id' => $admin['id'],
             'username' => $admin['username'],
@@ -78,13 +94,15 @@ function customerLogin($phone, $password) {
         return false;
     }
     
+    session_regenerate_id(true);
     $_SESSION['customer'] = [
         'id' => $customer['id'],
         'name' => $customer['name'],
         'phone' => $customer['phone'],
         'pppoe_username' => $customer['pppoe_username'],
         'logged_in' => true,
-        'login_time' => time()
+        'login_time' => time(),
+        'must_change_password' => password_verify('1234', $customer['portal_password'])
     ];
     
     logActivity('CUSTOMER_LOGIN', "Phone: {$phone}");
@@ -104,6 +122,14 @@ function requireCustomerLogin() {
     if (!isCustomerLoggedIn()) {
         setFlash('error', 'Silakan login terlebih dahulu');
         redirect(APP_URL . '/portal/login.php');
+    }
+
+    $mustChange = $_SESSION['customer']['must_change_password'] ?? false;
+    if ($mustChange) {
+        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        if ($script !== 'dashboard.php' && $script !== 'logout.php') {
+            redirect(APP_URL . '/portal/dashboard.php');
+        }
     }
 }
 
@@ -198,6 +224,7 @@ function salesLogin($username, $password) {
     }
     
     if (password_verify($password, $sales['password'])) {
+        session_regenerate_id(true);
         $_SESSION['sales'] = [
             'id' => $sales['id'],
             'name' => $sales['name'],
@@ -224,7 +251,15 @@ function salesLogout() {
 }
 
 function isSalesLoggedIn() {
-    return isset($_SESSION['sales']) && isset($_SESSION['sales']['logged_in']) && $_SESSION['sales']['logged_in'] === true;
+    if (!isset($_SESSION['sales']) || !isset($_SESSION['sales']['logged_in']) || $_SESSION['sales']['logged_in'] !== true) {
+        return false;
+    }
+    $loginTime = $_SESSION['sales']['login_time'] ?? null;
+    if (is_numeric($loginTime) && (time() - (int) $loginTime) > 43200) {
+        unset($_SESSION['sales']);
+        return false;
+    }
+    return true;
 }
 
 function requireSalesLogin() {
@@ -281,7 +316,15 @@ function technicianLogout() {
 }
 
 function isTechnicianLoggedIn() {
-    return isset($_SESSION['technician']) && isset($_SESSION['technician']['logged_in']) && $_SESSION['technician']['logged_in'] === true;
+    if (!isset($_SESSION['technician']) || !isset($_SESSION['technician']['logged_in']) || $_SESSION['technician']['logged_in'] !== true) {
+        return false;
+    }
+    $loginTime = $_SESSION['technician']['login_time'] ?? null;
+    if (is_numeric($loginTime) && (time() - (int) $loginTime) > 43200) {
+        unset($_SESSION['technician']);
+        return false;
+    }
+    return true;
 }
 
 function requireTechnicianLogin() {

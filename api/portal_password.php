@@ -17,6 +17,7 @@ try {
     }
     
     $input = json_decode(file_get_contents('php://input'), true);
+    requireApiCsrfToken($input);
     $password = $input['password'] ?? '';
     
     // Validate password
@@ -28,6 +29,10 @@ try {
     $customer = getCurrentCustomer();
     
     if (setCustomerPortalPassword($customer['id'], $password)) {
+        if (isset($_SESSION['customer']) && is_array($_SESSION['customer'])) {
+            $_SESSION['customer']['must_change_password'] = false;
+            $_SESSION['customer']['login_time'] = time();
+        }
         echo json_encode(['success' => true, 'message' => 'Password berhasil diubah']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Gagal mengubah password']);

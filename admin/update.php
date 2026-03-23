@@ -173,6 +173,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute($ss);
                     }
                 }
+
+                try {
+                    $pdo->query("SELECT id FROM hotspot_voucher_orders LIMIT 1");
+                } catch (Exception $e) {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS hotspot_voucher_orders (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        order_number VARCHAR(50) UNIQUE NOT NULL,
+                        customer_name VARCHAR(100) NOT NULL,
+                        customer_phone VARCHAR(20) NOT NULL,
+                        profile_name VARCHAR(100) NOT NULL,
+                        amount DECIMAL(15,2) NOT NULL,
+                        payment_gateway VARCHAR(20) NOT NULL DEFAULT 'tripay',
+                        payment_method VARCHAR(100) DEFAULT NULL,
+                        payment_link TEXT,
+                        payment_reference VARCHAR(100) DEFAULT NULL,
+                        payment_payload LONGTEXT,
+                        status ENUM('pending','paid','failed','expired') DEFAULT 'pending',
+                        paid_at DATETIME DEFAULT NULL,
+                        voucher_username VARCHAR(100) DEFAULT NULL,
+                        voucher_password VARCHAR(100) DEFAULT NULL,
+                        voucher_generated_at DATETIME DEFAULT NULL,
+                        fulfillment_status ENUM('pending','success','failed') DEFAULT 'pending',
+                        fulfillment_error TEXT,
+                        whatsapp_status ENUM('pending','sent','failed') DEFAULT 'pending',
+                        whatsapp_sent_at DATETIME DEFAULT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                    $output[] = "Created table: hotspot_voucher_orders";
+                }
+
+                $stmt = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
+                $stmt->execute(['PUBLIC_VOUCHER_PREFIX', 'VCH-']);
+                $stmt->execute(['PUBLIC_VOUCHER_LENGTH', '6']);
                 
                 $output[] = "Database migration completed.";
                 

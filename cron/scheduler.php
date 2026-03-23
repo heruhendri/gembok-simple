@@ -247,46 +247,18 @@ function runAutoInvoice($pdo)
 function runBackupDb()
 {
     echo "Running database backup...\n";
-
-    $backupDir = __DIR__ . '/../backups/';
-    if (!is_dir($backupDir)) {
-        mkdir($backupDir, 0777, true);
+    $retentionDays = (int) getSetting('BACKUP_RETENTION_DAYS', 7);
+    $result = createDatabaseBackup($retentionDays);
+    if (!$result['success']) {
+        echo "  ✗ " . ($result['message'] ?? 'Backup failed') . "\n";
+        return;
     }
-
-    $backupFile = $backupDir . 'backup_' . date('Y-m-d_H-i-s') . '.sql';
-
-    // Get database config
-    $dbHost = DB_HOST;
-    $dbName = DB_NAME;
-    $dbUser = DB_USER;
-    $dbPass = DB_PASS;
-
-    // Create backup using mysqldump
-    $command = sprintf(
-        "mysqldump -h %s -u %s -p%s %s > %s",
-        escapeshellarg($dbHost),
-        escapeshellarg($dbUser),
-        escapeshellarg($dbPass),
-        escapeshellarg($dbName),
-        escapeshellarg($backupFile)
-    );
-
-    exec($command, $output, $returnCode);
-
-    if ($returnCode === 0) {
-        $fileSize = filesize($backupFile);
-        echo "  ✓ Backup created: {$backupFile} (" . round($fileSize / 1024 / 1024, 2) . " MB)\n";
-
-        // Delete backups older than 7 days
-        $files = glob($backupDir . 'backup_*.sql');
-        foreach ($files as $file) {
-            if (filemtime($file) < strtotime('-7 days')) {
-                unlink($file);
-                echo "  ✓ Deleted old backup: " . basename($file) . "\n";
-            }
-        }
-    } else {
-        echo "  ✗ Backup failed\n";
+    $filePath = $result['file_path'] ?? '';
+    $fileSize = $result['file_size'] ?? 0;
+    echo "  ✓ Backup created: {$filePath} (" . round(((int) $fileSize) / 1024 / 1024, 2) . " MB)\n";
+    $deletedFiles = $result['deleted_files'] ?? [];
+    foreach ($deletedFiles as $deleted) {
+        echo "  ✓ Deleted old backup: {$deleted}\n";
     }
 }
 

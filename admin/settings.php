@@ -32,6 +32,24 @@ function getSettingValue($key, $default = '') {
     return $default;
 }
 
+if (isset($_GET['download_backup'])) {
+    $backupFile = sanitizeBackupFilename($_GET['download_backup'] ?? '');
+    if ($backupFile === '') {
+        setFlash('error', 'Nama file backup tidak valid');
+        redirect('settings.php');
+    }
+    $fullPath = getBackupDirectory() . $backupFile;
+    if (!is_file($fullPath)) {
+        setFlash('error', 'File backup tidak ditemukan');
+        redirect('settings.php');
+    }
+    header('Content-Type: application/sql');
+    header('Content-Disposition: attachment; filename="' . $backupFile . '"');
+    header('Content-Length: ' . filesize($fullPath));
+    readfile($fullPath);
+    exit;
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Verify CSRF token
@@ -213,9 +231,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 redirect('settings.php');
                 break;
+
+            case 'save_backup_settings':
+                $retentionDays = (int) ($_POST['backup_retention_days'] ?? 7);
+                if ($retentionDays < 1) {
+                    $retentionDays = 1;
+                }
+                if ($retentionDays > 365) {
+                    $retentionDays = 365;
+                }
+                $existing = fetchOne("SELECT id FROM settings WHERE setting_key = ?", ['BACKUP_RETENTION_DAYS']);
+                if ($existing) {
+                    update('settings', ['setting_value' => $retentionDays], 'setting_key = ?', ['BACKUP_RETENTION_DAYS']);
+                } else {
+                    insert('settings', ['setting_key' => 'BACKUP_RETENTION_DAYS', 'setting_value' => $retentionDays]);
+                }
+                setFlash('success', 'Pengaturan retensi backup berhasil disimpan');
+                redirect('settings.php');
+                break;
+
+            case 'backup_now':
+                $retentionDays = (int) getSettingValue('BACKUP_RETENTION_DAYS', 7);
+                $result = createDatabaseBackup($retentionDays);
+                if ($result['success']) {
+                    $deletedCount = count($result['deleted_files'] ?? []);
+                    $message = 'Backup berhasil dibuat: ' . ($result['file_name'] ?? '-');
+                    if ($deletedCount > 0) {
+                        $message .= " ({$deletedCount} backup lama dihapus)";
+                    }
+                    setFlash('success', $message);
+                    logActivity('BACKUP_NOW', 'File: ' . ($result['file_name'] ?? '-'));
+                } else {
+                    setFlash('error', $result['message'] ?? 'Gagal membuat backup');
+                }
+                redirect('settings.php');
+                break;
+
+            case 'restore_backup':
+                $backupFile = sanitizeBackupFilename($_POST['backup_file'] ?? '');
+                $confirmRestore = strtoupper(trim((string) ($_POST['confirm_restore'] ?? '')));
+                if ($backupFile === '') {
+                    setFlash('error', 'Pilih file backup yang valid');
+                    redirect('settings.php');
+                }
+                if ($confirmRestore !== 'RESTORE') {
+                    setFlash('error', 'Konfirmasi restore tidak valid. Ketik RESTORE untuk melanjutkan.');
+                    redirect('settings.php');
+                }
+                set_time_limit(0);
+                $result = restoreDatabaseBackup($backupFile);
+                if ($result['success']) {
+                    setFlash('success', 'Restore berhasil dari file: ' . $backupFile);
+                    logActivity('RESTORE_BACKUP', 'File: ' . $backupFile);
+                } else {
+                    setFlash('error', $result['message'] ?? 'Restore backup gagal');
+                }
+                redirect('settings.php');
+                break;
         }
     }
 }
+
+$backupRetentionDays = (int) getSettingValue('BACKUP_RETENTION_DAYS', 7);
+if ($backupRetentionDays < 1) {
+    $backupRetentionDays = 7;
+}
+$backupFiles = listDatabaseBackups();
 
 ob_start();
 ?>
@@ -713,6 +794,88 @@ ob_start();
 
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-save"></i> Simpan
+        </button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-database"></i> Backup & Restore Database</h3>
+    </div>
+
+    <form method="POST" style="margin-bottom: 20px;">
+        <input type="hidden" name="action" value="save_backup_settings">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+        <div class="form-group">
+            <label class="form-label">Retensi Backup Otomatis (hari)</label>
+            <input type="number" name="backup_retention_days" class="form-control" min="1" max="365" value="<?php echo $backupRetentionDays; ?>">
+            <small style="color: var(--text-muted);">Backup yang lebih lama dari nilai ini akan dihapus otomatis saat backup berjalan.</small>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> Simpan Retensi
+        </button>
+    </form>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+        <form method="POST" onsubmit="return confirm('Buat backup database sekarang?');">
+            <input type="hidden" name="action" value="backup_now">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-download"></i> Backup Sekarang
+            </button>
+        </form>
+    </div>
+
+    <h4 style="margin-bottom: 10px; color: var(--neon-cyan);">Daftar File Backup</h4>
+    <?php if (empty($backupFiles)): ?>
+        <p style="color: var(--text-muted); margin-bottom: 20px;">Belum ada file backup.</p>
+    <?php else: ?>
+        <div style="overflow-x: auto; margin-bottom: 20px;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nama File</th>
+                        <th>Ukuran</th>
+                        <th>Waktu</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($backupFiles as $file): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($file['name']); ?></td>
+                        <td><?php echo htmlspecialchars(formatBytes($file['size'] ?? 0)); ?></td>
+                        <td><?php echo htmlspecialchars($file['modified_at'] ?? '-'); ?></td>
+                        <td>
+                            <a class="btn btn-secondary btn-sm" href="settings.php?download_backup=<?php echo urlencode($file['name']); ?>">
+                                <i class="fas fa-file-download"></i> Download
+                            </a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+
+    <form method="POST" onsubmit="return confirm('Restore akan menimpa data database saat ini. Lanjutkan?');">
+        <input type="hidden" name="action" value="restore_backup">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+        <div class="form-group">
+            <label class="form-label">Pilih File Restore</label>
+            <select name="backup_file" class="form-control" required>
+                <option value="">Pilih file backup</option>
+                <?php foreach ($backupFiles as $file): ?>
+                    <option value="<?php echo htmlspecialchars($file['name']); ?>"><?php echo htmlspecialchars($file['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Ketik RESTORE untuk konfirmasi</label>
+            <input type="text" name="confirm_restore" class="form-control" placeholder="RESTORE" required>
+        </div>
+        <button type="submit" class="btn btn-danger">
+            <i class="fas fa-upload"></i> Restore Backup
         </button>
     </form>
 </div>

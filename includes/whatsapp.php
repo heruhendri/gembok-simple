@@ -54,7 +54,9 @@ function sendFonnteWhatsApp($phone, $message) {
     if ($httpCode === 200) {
         return ['success' => true, 'data' => json_decode($response, true)];
     } else {
-        return ['success' => false, 'message' => 'Failed to send WhatsApp via Fonnte (HTTP ' . $httpCode . ')'];
+        $errorMsg = "Failed to send WhatsApp via Fonnte (HTTP $httpCode): $response";
+        file_put_contents(__DIR__ . '/../logs/whatsapp_error.log', "[" . date('Y-m-d H:i:s') . "] SENDER_ERROR: " . $errorMsg . "\n", FILE_APPEND);
+        return ['success' => false, 'message' => $errorMsg];
     }
 }
 
@@ -89,7 +91,9 @@ function sendWablasWhatsApp($phone, $message) {
     if ($httpCode === 200) {
         return ['success' => true, 'data' => json_decode($response, true)];
     } else {
-        return ['success' => false, 'message' => 'Failed to send WhatsApp via Wablas (HTTP ' . $httpCode . ')'];
+        $errorMsg = "Failed to send WhatsApp via Wablas (HTTP $httpCode): $response";
+        file_put_contents(__DIR__ . '/../logs/whatsapp_error.log', "[" . date('Y-m-d H:i:s') . "] SENDER_ERROR: " . $errorMsg . "\n", FILE_APPEND);
+        return ['success' => false, 'message' => $errorMsg];
     }
 }
 
@@ -101,12 +105,20 @@ function sendMpwaWhatsApp($phone, $message) {
         return ['success' => false, 'message' => 'MPWA API key not configured'];
     }
     
+    // Sender number: nomor HP yang sudah di-scan QR di dashboard MPWA
+    $sender = getWhatsAppSetting('MPWA_SENDER', defined('MPWA_SENDER') ? MPWA_SENDER : '');
+    
+    if (empty($sender)) {
+        return ['success' => false, 'message' => 'MPWA sender number not configured'];
+    }
+    
     $url = 'https://mpwa.official.id/api/send';
     
     $data = [
-        'phone' => $phone,
-        'message' => $message,
-        'api_key' => $token
+        'api_key' => $token,
+        'sender'  => $sender,   // nomor pengirim yang terdaftar di MPWA
+        'number'  => $phone,    // nomor tujuan
+        'message' => $message
     ];
     
     $ch = curl_init($url);
@@ -124,7 +136,9 @@ function sendMpwaWhatsApp($phone, $message) {
     if ($httpCode === 200) {
         return ['success' => true, 'data' => json_decode($response, true)];
     } else {
-        return ['success' => false, 'message' => 'Failed to send WhatsApp via MPWA (HTTP ' . $httpCode . ')'];
+        $errorMsg = "Failed to send WhatsApp via MPWA (HTTP $httpCode): $response";
+        file_put_contents(__DIR__ . '/../logs/whatsapp_error.log', "[" . date('Y-m-d H:i:s') . "] SENDER_ERROR: " . $errorMsg . "\n", FILE_APPEND);
+        return ['success' => false, 'message' => $errorMsg];
     }
 }
 

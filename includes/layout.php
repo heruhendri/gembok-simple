@@ -1124,6 +1124,12 @@ if (isset($_GET['switch_router'])) {
                     <span>Template Voucher</span>
                 </a>
 
+                <a href="<?php echo APP_URL; ?>/admin/voucher-orders.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'voucher-orders.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-receipt"></i>
+                    <span>Order Voucher</span>
+                </a>
+
                 <a href="<?php echo APP_URL; ?>/admin/trouble.php"
                     class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'trouble.php' ? 'active' : ''; ?>">
                     <i class="fas fa-exclamation-triangle"></i>

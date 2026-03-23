@@ -20,11 +20,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
+    $throttleStatus = getLoginThrottleStatus('admin', $username, 5, 900, 900);
+    if ($throttleStatus['blocked']) {
+        $retryAfter = max(1, (int) ceil($throttleStatus['retry_after'] / 60));
+        setFlash('error', 'Terlalu banyak percobaan login. Coba lagi dalam ' . $retryAfter . ' menit.');
+        redirect('login.php');
+    }
 
     if (adminLogin($username, $password)) {
+        clearLoginFailures('admin', $username);
         setFlash('success', 'Login berhasil! Selamat datang.');
         redirect('dashboard.php');
     } else {
+        addLoginFailure('admin', $username, 5, 900, 900);
         setFlash('error', 'Username atau password salah!');
         redirect('login.php');
     }

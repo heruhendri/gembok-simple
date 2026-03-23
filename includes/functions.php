@@ -1044,16 +1044,170 @@ function verifyCsrfToken($token)
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
 
+function getApiCsrfToken($input = null)
+{
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if ($token === '' && is_array($input)) {
+        $token = $input['csrf_token'] ?? '';
+    }
+    return is_string($token) ? $token : '';
+}
+
+function verifyApiCsrfToken($input = null)
+{
+    return verifyCsrfToken(getApiCsrfToken($input));
+}
+
+function requireApiCsrfToken($input = null)
+{
+    if (!verifyApiCsrfToken($input)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid CSRF token'], 419);
+    }
+}
+
+function getClientIpAddress()
+{
+    $keys = [
+        'HTTP_CF_CONNECTING_IP',
+        'HTTP_X_FORWARDED_FOR',
+        'HTTP_X_REAL_IP',
+        'REMOTE_ADDR'
+    ];
+    foreach ($keys as $key) {
+        if (!empty($_SERVER[$key])) {
+            $value = trim((string) $_SERVER[$key]);
+            if ($key === 'HTTP_X_FORWARDED_FOR' && strpos($value, ',') !== false) {
+                $parts = explode(',', $value);
+                $value = trim($parts[0]);
+            }
+            if ($value !== '') {
+                return $value;
+            }
+        }
+    }
+    return 'unknown';
+}
+
+function getLoginThrottleStorePath()
+{
+    return __DIR__ . '/../logs/login_throttle.json';
+}
+
+function readLoginThrottleData()
+{
+    $file = getLoginThrottleStorePath();
+    if (!file_exists($file)) {
+        return [];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || trim($raw) === '') {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : [];
+}
+
+function writeLoginThrottleData($data)
+{
+    $file = getLoginThrottleStorePath();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    @file_put_contents($file, json_encode($data), LOCK_EX);
+}
+
+function buildLoginThrottleKey($scope, $identifier, $ip)
+{
+    $scopeValue = strtolower(trim((string) $scope));
+    $identifierValue = strtolower(trim((string) $identifier));
+    $ipValue = strtolower(trim((string) $ip));
+    return hash('sha256', $scopeValue . '|' . $identifierValue . '|' . $ipValue);
+}
+
+function getLoginThrottleStatus($scope, $identifier, $maxAttempts = 5, $windowSeconds = 900, $blockSeconds = 900)
+{
+    $now = time();
+    $ip = getClientIpAddress();
+    $key = buildLoginThrottleKey($scope, $identifier, $ip);
+    $data = readLoginThrottleData();
+    $record = $data[$key] ?? ['attempts' => [], 'blocked_until' => 0];
+    $attempts = array_values(array_filter($record['attempts'] ?? [], function ($ts) use ($now, $windowSeconds) {
+        return is_numeric($ts) && (int) $ts > ($now - $windowSeconds);
+    }));
+    $blockedUntil = (int) ($record['blocked_until'] ?? 0);
+    if (count($attempts) >= $maxAttempts && $blockedUntil < $now) {
+        $blockedUntil = $now + $blockSeconds;
+    }
+    $record['attempts'] = $attempts;
+    $record['blocked_until'] = $blockedUntil;
+    $data[$key] = $record;
+    writeLoginThrottleData($data);
+    return [
+        'blocked' => $blockedUntil > $now,
+        'retry_after' => max(0, $blockedUntil - $now),
+        'attempts' => count($attempts)
+    ];
+}
+
+function addLoginFailure($scope, $identifier, $maxAttempts = 5, $windowSeconds = 900, $blockSeconds = 900)
+{
+    $now = time();
+    $ip = getClientIpAddress();
+    $key = buildLoginThrottleKey($scope, $identifier, $ip);
+    $data = readLoginThrottleData();
+    $record = $data[$key] ?? ['attempts' => [], 'blocked_until' => 0];
+    $attempts = array_values(array_filter($record['attempts'] ?? [], function ($ts) use ($now, $windowSeconds) {
+        return is_numeric($ts) && (int) $ts > ($now - $windowSeconds);
+    }));
+    $attempts[] = $now;
+    $blockedUntil = (int) ($record['blocked_until'] ?? 0);
+    if (count($attempts) >= $maxAttempts) {
+        $blockedUntil = max($blockedUntil, $now + $blockSeconds);
+    }
+    $record['attempts'] = $attempts;
+    $record['blocked_until'] = $blockedUntil;
+    $data[$key] = $record;
+    writeLoginThrottleData($data);
+}
+
+function clearLoginFailures($scope, $identifier)
+{
+    $ip = getClientIpAddress();
+    $key = buildLoginThrottleKey($scope, $identifier, $ip);
+    $data = readLoginThrottleData();
+    if (isset($data[$key])) {
+        unset($data[$key]);
+        writeLoginThrottleData($data);
+    }
+}
+
 // Check if admin is logged in
 function isAdminLoggedIn()
 {
-    return isset($_SESSION['admin']['logged_in']) && $_SESSION['admin']['logged_in'] === true;
+    if (!isset($_SESSION['admin']['logged_in']) || $_SESSION['admin']['logged_in'] !== true) {
+        return false;
+    }
+    $loginTime = $_SESSION['admin']['login_time'] ?? null;
+    if (is_numeric($loginTime) && (time() - (int) $loginTime) > 43200) {
+        unset($_SESSION['admin']);
+        return false;
+    }
+    return true;
 }
 
 // Check if customer is logged in
 function isCustomerLoggedIn()
 {
-    return isset($_SESSION['customer']['logged_in']) && $_SESSION['customer']['logged_in'] === true;
+    if (!isset($_SESSION['customer']['logged_in']) || $_SESSION['customer']['logged_in'] !== true) {
+        return false;
+    }
+    $loginTime = $_SESSION['customer']['login_time'] ?? null;
+    if (is_numeric($loginTime) && (time() - (int) $loginTime) > 43200) {
+        unset($_SESSION['customer']);
+        return false;
+    }
+    return true;
 }
 
 // Get current admin
@@ -1100,4 +1254,529 @@ function formatBytes($bytes, $precision = 2)
     $pow = min($pow, count($units) - 1);
     $bytes /= pow(1024, $pow);
     return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+function getBackupDirectory()
+{
+    return __DIR__ . '/../backups/';
+}
+
+function ensureBackupDirectory()
+{
+    $backupDir = getBackupDirectory();
+    if (!is_dir($backupDir)) {
+        @mkdir($backupDir, 0777, true);
+    }
+    return is_dir($backupDir);
+}
+
+function sanitizeBackupFilename($filename)
+{
+    $name = basename((string) $filename);
+    return preg_match('/^backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql$/', $name) ? $name : '';
+}
+
+function listDatabaseBackups()
+{
+    if (!ensureBackupDirectory()) {
+        return [];
+    }
+    $files = glob(getBackupDirectory() . 'backup_*.sql');
+    if (!is_array($files)) {
+        return [];
+    }
+    usort($files, function ($a, $b) {
+        return filemtime($b) <=> filemtime($a);
+    });
+    $result = [];
+    foreach ($files as $file) {
+        $result[] = [
+            'name' => basename($file),
+            'path' => $file,
+            'size' => is_file($file) ? filesize($file) : 0,
+            'modified_at' => is_file($file) ? date('Y-m-d H:i:s', filemtime($file)) : null,
+            'timestamp' => is_file($file) ? filemtime($file) : 0
+        ];
+    }
+    return $result;
+}
+
+function applyBackupRetention($retentionDays = 7)
+{
+    $days = (int) $retentionDays;
+    if ($days < 1) {
+        $days = 1;
+    }
+    $deleted = [];
+    if (!ensureBackupDirectory()) {
+        return $deleted;
+    }
+    $threshold = strtotime("-{$days} days");
+    $files = glob(getBackupDirectory() . 'backup_*.sql');
+    if (!is_array($files)) {
+        return $deleted;
+    }
+    foreach ($files as $file) {
+        if (!is_file($file)) {
+            continue;
+        }
+        if (filemtime($file) < $threshold) {
+            if (@unlink($file)) {
+                $deleted[] = basename($file);
+            }
+        }
+    }
+    return $deleted;
+}
+
+function createDatabaseBackup($retentionDays = 7)
+{
+    if (!ensureBackupDirectory()) {
+        return ['success' => false, 'message' => 'Folder backup tidak bisa dibuat'];
+    }
+    $backupFile = getBackupDirectory() . 'backup_' . date('Y-m-d_H-i-s') . '.sql';
+    $command = sprintf(
+        "mysqldump -h %s -u %s -p%s %s > %s",
+        escapeshellarg(DB_HOST),
+        escapeshellarg(DB_USER),
+        escapeshellarg(DB_PASS),
+        escapeshellarg(DB_NAME),
+        escapeshellarg($backupFile)
+    );
+    exec($command, $output, $returnCode);
+    if ($returnCode !== 0 || !file_exists($backupFile)) {
+        return ['success' => false, 'message' => 'Gagal membuat backup database'];
+    }
+    $deletedFiles = applyBackupRetention($retentionDays);
+    return [
+        'success' => true,
+        'message' => 'Backup database berhasil dibuat',
+        'file_path' => $backupFile,
+        'file_name' => basename($backupFile),
+        'file_size' => filesize($backupFile),
+        'deleted_files' => $deletedFiles
+    ];
+}
+
+function restoreDatabaseBackup($filename)
+{
+    $safeName = sanitizeBackupFilename($filename);
+    if ($safeName === '') {
+        return ['success' => false, 'message' => 'Nama file backup tidak valid'];
+    }
+    if (!ensureBackupDirectory()) {
+        return ['success' => false, 'message' => 'Folder backup tidak ditemukan'];
+    }
+    $backupFile = getBackupDirectory() . $safeName;
+    if (!is_file($backupFile)) {
+        return ['success' => false, 'message' => 'File backup tidak ditemukan'];
+    }
+    $command = sprintf(
+        "mysql -h %s -u %s -p%s %s < %s",
+        escapeshellarg(DB_HOST),
+        escapeshellarg(DB_USER),
+        escapeshellarg(DB_PASS),
+        escapeshellarg(DB_NAME),
+        escapeshellarg($backupFile)
+    );
+    exec($command, $output, $returnCode);
+    if ($returnCode !== 0) {
+        return ['success' => false, 'message' => 'Restore backup gagal dijalankan'];
+    }
+    return ['success' => true, 'message' => 'Restore backup berhasil', 'file_name' => $safeName];
+}
+
+function ensurePublicVoucherTables()
+{
+    static $checked = false;
+    if ($checked) {
+        return true;
+    }
+    $pdo = getDB();
+    $sql = "CREATE TABLE IF NOT EXISTS hotspot_voucher_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_name VARCHAR(100) NOT NULL,
+        customer_phone VARCHAR(20) NOT NULL,
+        profile_name VARCHAR(100) NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        payment_gateway VARCHAR(20) NOT NULL DEFAULT 'tripay',
+        payment_method VARCHAR(100) DEFAULT NULL,
+        payment_link TEXT,
+        payment_reference VARCHAR(100) DEFAULT NULL,
+        payment_payload LONGTEXT,
+        status ENUM('pending','paid','failed','expired') DEFAULT 'pending',
+        paid_at DATETIME DEFAULT NULL,
+        voucher_username VARCHAR(100) DEFAULT NULL,
+        voucher_password VARCHAR(100) DEFAULT NULL,
+        voucher_generated_at DATETIME DEFAULT NULL,
+        fulfillment_status ENUM('pending','success','failed') DEFAULT 'pending',
+        fulfillment_error TEXT,
+        whatsapp_status ENUM('pending','sent','failed') DEFAULT 'pending',
+        whatsapp_sent_at DATETIME DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+    try {
+        $pdo->exec($sql);
+        $checked = true;
+        return true;
+    } catch (Exception $e) {
+        logError('Ensure hotspot_voucher_orders failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function getPublicVoucherCatalog()
+{
+    $profiles = mikrotikGetHotspotProfiles();
+    $catalog = [];
+    foreach ($profiles as $profile) {
+        $name = trim((string) ($profile['name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        $onLogin = parseMikhmonOnLogin($profile['on-login'] ?? '');
+        $price = (int) ($onLogin['selling_price'] ?? 0);
+        if ($price <= 0) {
+            $price = (int) ($onLogin['price'] ?? 0);
+        }
+        if ($price <= 0) {
+            continue;
+        }
+        $catalog[] = [
+            'profile_name' => $name,
+            'display_name' => $name,
+            'price' => $price,
+            'validity' => $onLogin['validity'] ?? '-'
+        ];
+    }
+    usort($catalog, function ($a, $b) {
+        return ((int) $a['price']) <=> ((int) $b['price']);
+    });
+    return $catalog;
+}
+
+function findPublicVoucherPackage($catalog, $profileName)
+{
+    $target = trim((string) $profileName);
+    foreach ($catalog as $item) {
+        if (($item['profile_name'] ?? '') === $target) {
+            return $item;
+        }
+    }
+    return null;
+}
+
+function normalizePublicVoucherPhone($phone)
+{
+    $digits = preg_replace('/\D+/', '', (string) $phone);
+    if ($digits === '') {
+        return '';
+    }
+    if (strpos($digits, '0') === 0) {
+        return '62' . substr($digits, 1);
+    }
+    if (strpos($digits, '62') === 0) {
+        return $digits;
+    }
+    return $digits;
+}
+
+function generatePublicVoucherOrderNumber()
+{
+    return 'VCR' . date('YmdHis') . strtoupper(generateRandomString(4, 'mixed'));
+}
+
+function createPublicVoucherOrder($payload)
+{
+    if (!ensurePublicVoucherTables()) {
+        return ['success' => false, 'message' => 'Gagal menyiapkan tabel voucher publik'];
+    }
+    require_once __DIR__ . '/payment.php';
+    $name = trim((string) ($payload['customer_name'] ?? ''));
+    $phone = normalizePublicVoucherPhone($payload['customer_phone'] ?? '');
+    $profileName = trim((string) ($payload['profile_name'] ?? ''));
+    $amount = (int) ($payload['amount'] ?? 0);
+    $gateway = strtolower(trim((string) ($payload['payment_gateway'] ?? 'tripay')));
+    $paymentMethod = trim((string) ($payload['payment_method'] ?? ''));
+    if ($name === '' || $phone === '' || $profileName === '' || $amount <= 0) {
+        return ['success' => false, 'message' => 'Data order voucher tidak valid'];
+    }
+    if (!in_array($gateway, ['tripay', 'midtrans'], true)) {
+        $gateway = 'tripay';
+    }
+    $orderNumber = '';
+    for ($i = 0; $i < 5; $i++) {
+        $candidate = generatePublicVoucherOrderNumber();
+        $exists = fetchOne("SELECT id FROM hotspot_voucher_orders WHERE order_number = ?", [$candidate]);
+        if (!$exists) {
+            $orderNumber = $candidate;
+            break;
+        }
+    }
+    if ($orderNumber === '') {
+        return ['success' => false, 'message' => 'Gagal membuat nomor order voucher'];
+    }
+    $payment = generatePaymentLink(
+        $orderNumber,
+        $amount,
+        $name,
+        $phone,
+        date('Y-m-d', strtotime('+1 day')),
+        $gateway,
+        $paymentMethod
+    );
+    if (!($payment['success'] ?? false)) {
+        return ['success' => false, 'message' => $payment['message'] ?? 'Gagal membuat link pembayaran'];
+    }
+    $insertId = insert('hotspot_voucher_orders', [
+        'order_number' => $orderNumber,
+        'customer_name' => $name,
+        'customer_phone' => $phone,
+        'profile_name' => $profileName,
+        'amount' => $amount,
+        'payment_gateway' => $gateway,
+        'payment_method' => $paymentMethod !== '' ? $paymentMethod : null,
+        'payment_link' => $payment['link'] ?? '',
+        'status' => 'pending',
+        'fulfillment_status' => 'pending',
+        'whatsapp_status' => 'pending',
+        'created_at' => date('Y-m-d H:i:s')
+    ]);
+    if (!$insertId) {
+        return ['success' => false, 'message' => 'Gagal menyimpan order voucher'];
+    }
+    return [
+        'success' => true,
+        'order_number' => $orderNumber,
+        'payment_link' => $payment['link'] ?? '',
+        'id' => $insertId
+    ];
+}
+
+function sanitizePublicVoucherOrderNumber($orderNumber)
+{
+    $value = trim((string) $orderNumber);
+    return preg_match('/^VCR[0-9]{14}[A-Za-z0-9]{4}$/', $value) ? strtoupper($value) : '';
+}
+
+function getPublicVoucherOrderByNumber($orderNumber)
+{
+    if (!ensurePublicVoucherTables()) {
+        return null;
+    }
+    $safe = sanitizePublicVoucherOrderNumber($orderNumber);
+    if ($safe === '') {
+        return null;
+    }
+    return fetchOne("SELECT * FROM hotspot_voucher_orders WHERE order_number = ?", [$safe]);
+}
+
+function buildPublicVoucherMessage($order)
+{
+    $message = "Pembayaran voucher hotspot berhasil.\n\n";
+    $message .= "No Order: " . ($order['order_number'] ?? '-') . "\n";
+    $message .= "Profile: " . ($order['profile_name'] ?? '-') . "\n";
+    $message .= "Username: " . ($order['voucher_username'] ?? '-') . "\n";
+    $message .= "Password: " . ($order['voucher_password'] ?? '-') . "\n";
+    $message .= "Nominal: " . formatCurrency($order['amount'] ?? 0) . "\n\n";
+    $message .= "Simpan kode voucher ini dengan aman.";
+    return $message;
+}
+
+function sendPublicVoucherWhatsapp($order)
+{
+    $phone = $order['customer_phone'] ?? '';
+    if ($phone === '') {
+        return false;
+    }
+    $message = buildPublicVoucherMessage($order);
+    return sendWhatsApp($phone, $message);
+}
+
+function fulfillPublicVoucherOrder($orderNumber)
+{
+    if (!ensurePublicVoucherTables()) {
+        return ['success' => false, 'message' => 'Tabel order voucher belum siap'];
+    }
+    $safe = sanitizePublicVoucherOrderNumber($orderNumber);
+    if ($safe === '') {
+        return ['success' => false, 'message' => 'Nomor order voucher tidak valid'];
+    }
+    $order = fetchOne("SELECT * FROM hotspot_voucher_orders WHERE order_number = ?", [$safe]);
+    if (!$order) {
+        return ['success' => false, 'message' => 'Order voucher tidak ditemukan'];
+    }
+    if (($order['status'] ?? '') !== 'paid') {
+        return ['success' => false, 'message' => 'Order voucher belum lunas'];
+    }
+    if (!empty($order['voucher_username']) && !empty($order['voucher_password'])) {
+        if (($order['whatsapp_status'] ?? 'pending') !== 'sent') {
+            $waSent = sendPublicVoucherWhatsapp($order);
+            update('hotspot_voucher_orders', [
+                'whatsapp_status' => $waSent ? 'sent' : 'failed',
+                'whatsapp_sent_at' => $waSent ? date('Y-m-d H:i:s') : null
+            ], 'order_number = ?', [$safe]);
+        }
+        return ['success' => true, 'message' => 'Voucher sudah tersedia', 'order' => getPublicVoucherOrderByNumber($safe)];
+    }
+    $prefix = trim((string) getSetting('PUBLIC_VOUCHER_PREFIX', 'VCH-'));
+    $length = (int) getSetting('PUBLIC_VOUCHER_LENGTH', 6);
+    if ($length < 4) {
+        $length = 4;
+    }
+    if ($length > 12) {
+        $length = 12;
+    }
+    $profileName = trim((string) ($order['profile_name'] ?? ''));
+    if ($profileName === '') {
+        return ['success' => false, 'message' => 'Profile voucher tidak valid'];
+    }
+    $created = false;
+    $username = '';
+    $password = '';
+    $errorMessage = '';
+    for ($i = 0; $i < 20; $i++) {
+        $seed = strtoupper(generateRandomString($length, 'mixed'));
+        $username = $prefix . $seed;
+        $password = $seed;
+        $comment = 'public-voucher-' . $safe;
+        if (mikrotikAddHotspotUser($username, $password, $profileName, ['comment' => $comment])) {
+            $created = true;
+            break;
+        }
+    }
+    if (!$created) {
+        $errorMessage = 'Gagal membuat voucher di MikroTik';
+        update('hotspot_voucher_orders', [
+            'fulfillment_status' => 'failed',
+            'fulfillment_error' => $errorMessage
+        ], 'order_number = ?', [$safe]);
+        logError('Fulfill public voucher failed: ' . $safe);
+        return ['success' => false, 'message' => $errorMessage];
+    }
+    update('hotspot_voucher_orders', [
+        'voucher_username' => $username,
+        'voucher_password' => $password,
+        'voucher_generated_at' => date('Y-m-d H:i:s'),
+        'fulfillment_status' => 'success',
+        'fulfillment_error' => null
+    ], 'order_number = ?', [$safe]);
+    recordHotspotSale($username, $profileName, (int) $order['amount'], (int) $order['amount'], $prefix);
+    $updatedOrder = getPublicVoucherOrderByNumber($safe);
+    $waSent = false;
+    if ($updatedOrder) {
+        $waSent = sendPublicVoucherWhatsapp($updatedOrder);
+    }
+    update('hotspot_voucher_orders', [
+        'whatsapp_status' => $waSent ? 'sent' : 'failed',
+        'whatsapp_sent_at' => $waSent ? date('Y-m-d H:i:s') : null
+    ], 'order_number = ?', [$safe]);
+    return [
+        'success' => true,
+        'message' => $waSent ? 'Voucher berhasil dibuat dan dikirim ke WhatsApp' : 'Voucher berhasil dibuat, pengiriman WhatsApp gagal',
+        'order' => getPublicVoucherOrderByNumber($safe)
+    ];
+}
+
+function markPublicVoucherOrderPaid($orderNumber, $gateway, $paymentData = [])
+{
+    if (!ensurePublicVoucherTables()) {
+        return false;
+    }
+    $safe = sanitizePublicVoucherOrderNumber($orderNumber);
+    if ($safe === '') {
+        return false;
+    }
+    $order = fetchOne("SELECT * FROM hotspot_voucher_orders WHERE order_number = ?", [$safe]);
+    if (!$order) {
+        return false;
+    }
+    $paymentMethod = $paymentData['payment_method'] ?? ($paymentData['payment_type'] ?? null);
+    $paymentRef = $paymentData['reference'] ?? ($paymentData['transaction_id'] ?? null);
+    update('hotspot_voucher_orders', [
+        'status' => 'paid',
+        'paid_at' => $order['paid_at'] ?: date('Y-m-d H:i:s'),
+        'payment_gateway' => $gateway,
+        'payment_method' => $paymentMethod ?: ($order['payment_method'] ?? null),
+        'payment_reference' => $paymentRef ?: ($order['payment_reference'] ?? null),
+        'payment_payload' => json_encode($paymentData)
+    ], 'order_number = ?', [$safe]);
+    $result = fulfillPublicVoucherOrder($safe);
+    return $result['success'] ?? false;
+}
+
+function markPublicVoucherOrderFailed($orderNumber, $status, $paymentData = [])
+{
+    if (!ensurePublicVoucherTables()) {
+        return false;
+    }
+    $safe = sanitizePublicVoucherOrderNumber($orderNumber);
+    if ($safe === '') {
+        return false;
+    }
+    $order = fetchOne("SELECT * FROM hotspot_voucher_orders WHERE order_number = ?", [$safe]);
+    if (!$order) {
+        return false;
+    }
+    if (($order['status'] ?? '') === 'paid') {
+        return true;
+    }
+    $failedStatus = strtolower((string) $status) === 'expired' ? 'expired' : 'failed';
+    return update('hotspot_voucher_orders', [
+        'status' => $failedStatus,
+        'payment_payload' => json_encode($paymentData)
+    ], 'order_number = ?', [$safe]);
+}
+
+function syncPublicVoucherOrderPaymentStatus($orderNumber)
+{
+    $order = getPublicVoucherOrderByNumber($orderNumber);
+    if (!$order) {
+        return null;
+    }
+    if (($order['status'] ?? '') === 'paid') {
+        if (($order['fulfillment_status'] ?? '') !== 'success') {
+            fulfillPublicVoucherOrder($order['order_number']);
+            $order = getPublicVoucherOrderByNumber($order['order_number']);
+        }
+        return $order;
+    }
+    require_once __DIR__ . '/payment.php';
+    $gateway = strtolower((string) ($order['payment_gateway'] ?? 'tripay'));
+    $payload = [];
+    $status = '';
+    if ($gateway === 'midtrans') {
+        $result = getMidtransPaymentStatus($order['order_number']);
+        if (!($result['success'] ?? false)) {
+            return $order;
+        }
+        $payload = $result['data'] ?? [];
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            $payload = $payload['data'];
+        }
+        $status = strtolower((string) ($payload['transaction_status'] ?? ''));
+        if ($status === 'settlement' || $status === 'capture') {
+            markPublicVoucherOrderPaid($order['order_number'], 'midtrans', $payload);
+        } elseif (in_array($status, ['expire', 'cancel', 'deny'], true)) {
+            markPublicVoucherOrderFailed($order['order_number'], $status, $payload);
+        }
+    } else {
+        $result = getTripayPaymentStatus($order['order_number']);
+        if (!($result['success'] ?? false)) {
+            return $order;
+        }
+        $payload = $result['data'] ?? [];
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            $payload = $payload['data'];
+        }
+        $status = strtoupper((string) ($payload['status'] ?? ''));
+        if ($status === 'PAID') {
+            markPublicVoucherOrderPaid($order['order_number'], 'tripay', $payload);
+        } elseif (in_array($status, ['EXPIRED', 'FAILED'], true)) {
+            markPublicVoucherOrderFailed($order['order_number'], strtolower($status), $payload);
+        }
+    }
+    return getPublicVoucherOrderByNumber($order['order_number']);
 }
