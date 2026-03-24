@@ -3,7 +3,8 @@
  * WhatsApp Gateway Integration
  */
 
-require_once 'config.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/db.php';
 
 // Helper to get settings from database if constant is empty
 function getWhatsAppSetting($key, $constantValue) {
@@ -18,6 +19,11 @@ function getWhatsAppSetting($key, $constantValue) {
     } catch (Exception $e) {
         return '';
     }
+}
+
+function logWhatsAppError($message)
+{
+    file_put_contents(__DIR__ . '/../logs/whatsapp_error.log', "[" . date('Y-m-d H:i:s') . "] " . $message . "\n", FILE_APPEND);
 }
 
 // Fonnte WhatsApp Sender
@@ -102,6 +108,7 @@ function sendMpwaWhatsApp($phone, $message) {
     $token = getWhatsAppSetting('MPWA_API_KEY', defined('MPWA_API_KEY') ? MPWA_API_KEY : '');
     
     if (empty($token)) {
+        logWhatsAppError("SENDER_ERROR: MPWA API key not configured");
         return ['success' => false, 'message' => 'MPWA API key not configured'];
     }
     
@@ -109,10 +116,15 @@ function sendMpwaWhatsApp($phone, $message) {
     $sender = getWhatsAppSetting('MPWA_SENDER', defined('MPWA_SENDER') ? MPWA_SENDER : '');
     
     if (empty($sender)) {
+        logWhatsAppError("SENDER_ERROR: MPWA sender number not configured");
         return ['success' => false, 'message' => 'MPWA sender number not configured'];
     }
     
-    $url = 'https://mpwa.official.id/api/send';
+    $url = getWhatsAppSetting('MPWA_API_URL', defined('MPWA_API_URL') ? MPWA_API_URL : '');
+    $url = trim((string) $url);
+    if ($url === '') {
+        $url = 'https://mpwa.official.id/api/send';
+    }
     
     $data = [
         'api_key' => $token,
@@ -125,19 +137,48 @@ function sendMpwaWhatsApp($phone, $message) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Accept: application/json',
+        'User-Agent: GEMBOK/2.x (MPWA Client)'
+    ]);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     
     $response = curl_exec($ch);
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
     curl_close($ch);
     
+    if ($response === false || $httpCode === 0) {
+        $errorMsg = "Failed to send WhatsApp via MPWA (HTTP $httpCode, cURL $curlErrno): $curlError";
+        logWhatsAppError("SENDER_ERROR: " . $errorMsg . " | URL: " . (string) $effectiveUrl);
+        return ['success' => false, 'message' => $errorMsg];
+    }
+
     if ($httpCode === 200) {
-        return ['success' => true, 'data' => json_decode($response, true)];
+        $decoded = json_decode((string) $response, true);
+        if (is_array($decoded)) {
+            $status = null;
+            if (isset($decoded['success'])) {
+                $status = (bool) $decoded['success'];
+            } elseif (isset($decoded['status'])) {
+                $status = (bool) $decoded['status'];
+            }
+            if ($status === false) {
+                $msg = (string) ($decoded['message'] ?? 'MPWA mengembalikan status gagal');
+                $errorMsg = "Failed to send WhatsApp via MPWA (HTTP $httpCode): $msg";
+                logWhatsAppError("SENDER_ERROR: " . $errorMsg . " | RAW: " . mb_substr((string) $response, 0, 800));
+                return ['success' => false, 'message' => $errorMsg, 'data' => $decoded];
+            }
+        }
+        return ['success' => true, 'data' => $decoded];
     } else {
         $errorMsg = "Failed to send WhatsApp via MPWA (HTTP $httpCode): $response";
-        file_put_contents(__DIR__ . '/../logs/whatsapp_error.log', "[" . date('Y-m-d H:i:s') . "] SENDER_ERROR: " . $errorMsg . "\n", FILE_APPEND);
+        logWhatsAppError("SENDER_ERROR: " . $errorMsg);
         return ['success' => false, 'message' => $errorMsg];
     }
 }

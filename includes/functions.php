@@ -91,7 +91,7 @@ function generateInvoiceNumber()
 
 function sendWhatsApp($phone, $message)
 {
-    require_once 'whatsapp.php';
+    require_once __DIR__ . '/whatsapp.php';
 
     // Get default WhatsApp gateway from settings
     $defaultGateway = fetchOne("SELECT setting_value FROM settings WHERE setting_key = ?", ['DEFAULT_WHATSAPP_GATEWAY'])['setting_value'] ?? 'fonnte';
@@ -1530,6 +1530,15 @@ function createPublicVoucherOrder($payload)
     if (!($payment['success'] ?? false)) {
         return ['success' => false, 'message' => $payment['message'] ?? 'Gagal membuat link pembayaran'];
     }
+    $paymentData = $payment['data'] ?? [];
+    $paymentReference = null;
+    if (is_array($paymentData)) {
+        if ($gateway === 'tripay' && isset($paymentData['reference'])) {
+            $paymentReference = (string) $paymentData['reference'];
+        } elseif ($gateway === 'midtrans' && isset($paymentData['token'])) {
+            $paymentReference = (string) $paymentData['token'];
+        }
+    }
     $insertId = insert('hotspot_voucher_orders', [
         'order_number' => $orderNumber,
         'customer_name' => $name,
@@ -1539,6 +1548,8 @@ function createPublicVoucherOrder($payload)
         'payment_gateway' => $gateway,
         'payment_method' => $paymentMethod !== '' ? $paymentMethod : null,
         'payment_link' => $payment['link'] ?? '',
+        'payment_reference' => $paymentReference,
+        'payment_payload' => is_array($paymentData) ? json_encode($paymentData) : null,
         'status' => 'pending',
         'fulfillment_status' => 'pending',
         'whatsapp_status' => 'pending',
@@ -1578,8 +1589,15 @@ function buildPublicVoucherMessage($order)
     $message = "Pembayaran voucher hotspot berhasil.\n\n";
     $message .= "No Order: " . ($order['order_number'] ?? '-') . "\n";
     $message .= "Profile: " . ($order['profile_name'] ?? '-') . "\n";
-    $message .= "Username: " . ($order['voucher_username'] ?? '-') . "\n";
-    $message .= "Password: " . ($order['voucher_password'] ?? '-') . "\n";
+    $username = (string) ($order['voucher_username'] ?? '-');
+    $password = (string) ($order['voucher_password'] ?? '-');
+    if ($username !== '-' && $password !== '-' && $username === $password) {
+        $message .= "Kode Voucher: " . $username . "\n";
+        $message .= "Password: sama dengan kode voucher\n";
+    } else {
+        $message .= "Username: " . $username . "\n";
+        $message .= "Password: " . $password . "\n";
+    }
     $message .= "Nominal: " . formatCurrency($order['amount'] ?? 0) . "\n\n";
     $message .= "Simpan kode voucher ini dengan aman.";
     return $message;
@@ -1622,6 +1640,13 @@ function fulfillPublicVoucherOrder($orderNumber)
         return ['success' => true, 'message' => 'Voucher sudah tersedia', 'order' => getPublicVoucherOrderByNumber($safe)];
     }
     $prefix = trim((string) getSetting('PUBLIC_VOUCHER_PREFIX', 'VCH-'));
+    $numericOnly = (string) getSetting('PUBLIC_VOUCHER_CODE_TYPE', 'numeric') === 'numeric'
+        || (int) getSetting('PUBLIC_VOUCHER_NUMERIC_ONLY', 0) === 1;
+    $passwordSame = (string) getSetting('PUBLIC_VOUCHER_PASSWORD_MODE', 'same') === 'same'
+        || (int) getSetting('PUBLIC_VOUCHER_PASSWORD_SAME', 0) === 1;
+    if ($numericOnly) {
+        $prefix = preg_replace('/\D+/', '', $prefix);
+    }
     $length = (int) getSetting('PUBLIC_VOUCHER_LENGTH', 6);
     if ($length < 4) {
         $length = 4;
@@ -1638,9 +1663,9 @@ function fulfillPublicVoucherOrder($orderNumber)
     $password = '';
     $errorMessage = '';
     for ($i = 0; $i < 20; $i++) {
-        $seed = strtoupper(generateRandomString($length, 'mixed'));
-        $username = $prefix . $seed;
-        $password = $seed;
+        $seed = generateRandomString($length, $numericOnly ? 'numeric' : 'mixed');
+        $username = $prefix . ($numericOnly ? $seed : strtoupper($seed));
+        $password = $passwordSame ? $username : ($numericOnly ? $seed : strtoupper($seed));
         $comment = 'public-voucher-' . $safe;
         if (mikrotikAddHotspotUser($username, $password, $profileName, ['comment' => $comment])) {
             $created = true;
@@ -1737,7 +1762,7 @@ function syncPublicVoucherOrderPaymentStatus($orderNumber)
         return null;
     }
     if (($order['status'] ?? '') === 'paid') {
-        if (($order['fulfillment_status'] ?? '') !== 'success') {
+        if (($order['fulfillment_status'] ?? '') !== 'success' || ($order['whatsapp_status'] ?? 'pending') !== 'sent') {
             fulfillPublicVoucherOrder($order['order_number']);
             $order = getPublicVoucherOrderByNumber($order['order_number']);
         }

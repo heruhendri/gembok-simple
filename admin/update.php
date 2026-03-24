@@ -84,13 +84,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $output = [];
         $returnVar = 0;
         $projectRoot = realpath(dirname(__DIR__));
-        
-        // 1. Run git pull
-        $cmd = 'cd ' . escapeshellarg($projectRoot) . ' && git pull 2>&1';
-        exec($cmd, $output, $returnVar);
+        $gitDir = $projectRoot ? $projectRoot . DIRECTORY_SEPARATOR . '.git' : '';
+        $isGitRepo = $gitDir !== '' && is_dir($gitDir);
+
+        if (!$isGitRepo) {
+            $output[] = 'Gagal update otomatis: folder aplikasi ini bukan repository Git (.git tidak ditemukan).';
+            $output[] = 'Solusi: deploy ulang dari source Git atau update manual dengan upload file rilis terbaru.';
+            $returnVar = 1;
+        } else {
+            $cmd = 'cd ' . escapeshellarg($projectRoot) . ' && git pull 2>&1';
+            exec($cmd, $output, $returnVar);
+        }
         
         if ($returnVar === 0) {
-            // 2. Run Database Migration if successful
             require_once '../includes/db.php';
             try {
                 $pdo = getDB();

@@ -130,9 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'WABLAS_API_TOKEN' => sanitize($_POST['wablas_api_token']),
                     'MPWA_API_KEY' => sanitize($_POST['mpwa_api_key']),
                     'MPWA_SENDER'  => sanitize($_POST['mpwa_sender']),
+                    'MPWA_API_URL' => sanitize($_POST['mpwa_api_url'] ?? ''),
                     'TRIPAY_API_KEY' => sanitize($_POST['tripay_api_key']),
                     'TRIPAY_PRIVATE_KEY' => sanitize($_POST['tripay_private_key']),
                     'TRIPAY_MERCHANT_CODE' => sanitize($_POST['tripay_merchant_code']),
+                    'TRIPAY_MODE' => sanitize($_POST['tripay_mode'] ?? ''),
                     'MIDTRANS_API_KEY' => sanitize($_POST['midtrans_api_key']),
                     'MIDTRANS_MERCHANT_CODE' => sanitize($_POST['midtrans_merchant_code']),
                     'DEFAULT_PAYMENT_GATEWAY' => sanitize($_POST['default_payment_gateway']),
@@ -151,6 +153,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 setFlash('success', 'Pengaturan integrasi berhasil disimpan');
+                redirect('settings.php');
+                break;
+
+            case 'test_whatsapp':
+                $testPhone = trim((string) ($_POST['test_whatsapp_phone'] ?? ''));
+                $testMessage = trim((string) ($_POST['test_whatsapp_message'] ?? ''));
+                if ($testPhone === '' || $testMessage === '') {
+                    setFlash('error', 'Nomor WhatsApp dan pesan test wajib diisi');
+                    redirect('settings.php');
+                }
+                $digits = preg_replace('/\D+/', '', $testPhone);
+                if ($digits !== '') {
+                    if (strpos($digits, '0') === 0) {
+                        $digits = '62' . substr($digits, 1);
+                    } elseif (strpos($digits, '62') !== 0) {
+                        $digits = '62' . $digits;
+                    }
+                }
+                require_once '../includes/whatsapp.php';
+                $defaultGateway = getSetting('DEFAULT_WHATSAPP_GATEWAY', 'fonnte');
+                $result = sendWhatsAppMessage($digits, $testMessage, $defaultGateway);
+                if (($result['success'] ?? false) === true) {
+                    setFlash('success', 'Test WhatsApp berhasil dikirim (gateway: ' . strtoupper($defaultGateway) . ')');
+                } else {
+                    $msg = $result['message'] ?? 'Test WhatsApp gagal';
+                    setFlash('error', 'Test WhatsApp gagal (gateway: ' . strtoupper($defaultGateway) . '): ' . $msg);
+                }
+                redirect('settings.php');
+                break;
+
+            case 'test_mpwa_connection':
+                $url = trim((string) getSetting('MPWA_API_URL', 'https://mpwa.official.id/api/send'));
+                if ($url === '') {
+                    $url = 'https://mpwa.official.id/api/send';
+                }
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_NOBODY, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: GEMBOK/2.x (MPWA Probe)']);
+                curl_exec($ch);
+                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErrno = (int) curl_errno($ch);
+                $curlError = (string) curl_error($ch);
+                unset($ch);
+                if ($curlErrno !== 0 || $httpCode === 0) {
+                    setFlash('error', 'Koneksi MPWA gagal (HTTP ' . $httpCode . ', cURL ' . $curlErrno . '): ' . $curlError);
+                } else {
+                    setFlash('success', 'Koneksi MPWA OK (HTTP ' . $httpCode . ').');
+                }
                 redirect('settings.php');
                 break;
                 
@@ -591,8 +645,8 @@ ob_start();
         <h3 class="card-title"><i class="fas fa-plug"></i> Integrasi & API</h3>
     </div>
     
-    <form method="POST">
-        <input type="hidden" name="action" value="save_integrations">
+    <form method="POST" id="integrationsForm">
+        <input type="hidden" name="action" id="integrationsAction" value="save_integrations">
         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         
         <h4 style="margin-bottom: 15px; color: var(--neon-cyan);">WhatsApp Gateway</h4>
@@ -644,6 +698,12 @@ ob_start();
         </div>
 
         <div class="form-group">
+            <label class="form-label">MPWA API URL</label>
+            <input type="text" name="mpwa_api_url" class="form-control" value="<?php echo htmlspecialchars($settings['MPWA_API_URL'] ?? ''); ?>" placeholder="https://wa.alijaya.net/send-message">
+            <small style="color: var(--text-muted);">Kosongkan untuk default. Contoh: https://wa.alijaya.net/send-message</small>
+        </div>
+
+        <div class="form-group">
             <label class="form-label">MPWA Sender Number <span style="color: #ff6b6b;">*wajib</span></label>
             <input type="text" name="mpwa_sender" class="form-control" value="<?php echo htmlspecialchars($settings['MPWA_SENDER'] ?? ''); ?>" placeholder="628xxxxxxxxxx">
             <small style="color: var(--text-muted);">Nomor WhatsApp yang sudah di-scan QR di dashboard MPWA (format: 628...)</small>
@@ -653,6 +713,32 @@ ob_start();
             <label class="form-label">WhatsApp Admin Number</label>
             <input type="text" name="whatsapp_admin_number" class="form-control" value="<?php echo htmlspecialchars($settings['WHATSAPP_ADMIN_NUMBER'] ?? ''); ?>" placeholder="628xxxxxxxxxx">
             <small style="color: var(--text-muted);">Nomor WhatsApp admin untuk mengelola bot (format: 628...)</small>
+        </div>
+
+        <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 10px; padding: 16px 20px; margin-top: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <i class="fab fa-whatsapp" style="color: #22c55e;"></i>
+                <strong style="color: #22c55e;">Test Kirim WhatsApp</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+                Gunakan ini untuk memastikan token/gateway WhatsApp sudah benar. Ini menguji pengiriman pesan keluar (bukan webhook masuk).
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Nomor Tujuan</label>
+                    <input type="text" name="test_whatsapp_phone" class="form-control" placeholder="628xxxxxxxxxx atau 08xxxxxxxxxx">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Pesan Test</label>
+                    <input type="text" name="test_whatsapp_message" class="form-control" value="Test WhatsApp GEMBOK" placeholder="Test WhatsApp">
+                </div>
+                <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
+                    <button type="submit" class="btn btn-success" onclick="setIntegrationsAction('test_whatsapp')"><i class="fas fa-paper-plane"></i> Kirim Test</button>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
+                    <button type="submit" class="btn btn-dark" onclick="setIntegrationsAction('test_mpwa_connection')"><i class="fas fa-network-wired"></i> Test Koneksi MPWA</button>
+                </div>
+            </div>
         </div>
         
         <hr style="margin: 30px 0; border-color: var(--border-color);">
@@ -694,6 +780,15 @@ ob_start();
                 <label class="form-label">Tripay Merchant Code</label>
                 <input type="text" name="tripay_merchant_code" class="form-control" value="<?php echo htmlspecialchars($settings['TRIPAY_MERCHANT_CODE'] ?? ''); ?>" placeholder="Masukkan Merchant Code">
             </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Tripay Mode</label>
+            <select name="tripay_mode" class="form-control">
+                <option value="" <?php echo empty($settings['TRIPAY_MODE'] ?? '') ? 'selected' : ''; ?>>Production (default)</option>
+                <option value="sandbox" <?php echo (($settings['TRIPAY_MODE'] ?? '') === 'sandbox') ? 'selected' : ''; ?>>Sandbox</option>
+            </select>
+            <small style="color: var(--text-muted);">Gunakan Sandbox hanya jika memakai kredensial simulator Tripay.</small>
         </div>
         
         <hr style="margin: 30px 0; border-color: var(--border-color);">
@@ -792,7 +887,7 @@ ob_start();
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" onclick="setIntegrationsAction('save_integrations')">
             <i class="fas fa-save"></i> Simpan
         </button>
     </form>
@@ -943,6 +1038,13 @@ function copyWebhookUrl(inputId, btn) {
             btn.style.background = 'var(--neon-cyan)';
         }, 2000);
     });
+}
+
+function setIntegrationsAction(action) {
+    const el = document.getElementById('integrationsAction');
+    if (el) {
+        el.value = action;
+    }
 }
 </script>
 
