@@ -90,6 +90,11 @@ ob_start();
                         <i class="fas fa-id-card"></i>
                         <span>Hotspot Profiles</span>
                     </a>
+
+                    <a href="hotspot-login-export.php" class="menu-grid-item">
+                        <i class="fas fa-right-to-bracket"></i>
+                        <span>Login Template</span>
+                    </a>
                     
                     <a href="voucher-editor.php" class="menu-grid-item">
                         <i class="fas fa-magic"></i>
