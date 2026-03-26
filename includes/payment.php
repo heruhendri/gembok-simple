@@ -229,8 +229,12 @@ function generateTripayPaymentLink($invoiceNumber, $amount, $customerName, $cust
         'signature' => $signature
     ];
 
+    $usePretty = (string) paymentGetConfig('USE_PRETTY_URLS', '1') === '1';
     if (preg_match('/^VCR/i', $merchantRef)) {
-        $payload['return_url'] = rtrim(APP_URL, '/') . '/voucher/status/' . rawurlencode($merchantRef);
+        $payload['return_url'] = rtrim(APP_URL, '/') . ($usePretty
+            ? ('/voucher/status/' . rawurlencode($merchantRef))
+            : ('/voucher-status.php?order=' . rawurlencode($merchantRef))
+        );
     } else {
         $payload['return_url'] = rtrim(APP_URL, '/') . '/portal/dashboard.php';
     }
@@ -353,8 +357,12 @@ function generateMidtransPaymentLink($invoiceNumber, $amount, $customerName, $cu
         $payload['enabled_payments'] = [(string) $paymentMethod];
     }
 
+    $usePretty = (string) paymentGetConfig('USE_PRETTY_URLS', '1') === '1';
     if (preg_match('/^VCR/i', $orderId)) {
-        $payload['callbacks'] = ['finish' => rtrim(APP_URL, '/') . '/voucher/status/' . rawurlencode($orderId)];
+        $payload['callbacks'] = ['finish' => rtrim(APP_URL, '/') . ($usePretty
+            ? ('/voucher/status/' . rawurlencode($orderId))
+            : ('/voucher-status.php?order=' . rawurlencode($orderId))
+        )];
     } else {
         $payload['callbacks'] = ['finish' => rtrim(APP_URL, '/') . '/portal/dashboard.php'];
     }
