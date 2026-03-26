@@ -19,9 +19,40 @@ if (file_exists($localVersionFile)) {
 $remoteVersion = null;
 $statusMessage = '';
 $statusType = 'info';
+$projectRoot = realpath(dirname(__DIR__));
+$gitDir = $projectRoot ? $projectRoot . DIRECTORY_SEPARATOR . '.git' : '';
+$isGitRepo = $gitDir !== '' && is_dir($gitDir);
+$gitBranch = null;
+$gitCommit = null;
+$gitRemote = null;
+if ($isGitRepo) {
+    $tmp = [];
+    $rv = 0;
+    exec('cd ' . escapeshellarg($projectRoot) . ' && git rev-parse --abbrev-ref HEAD 2>&1', $tmp, $rv);
+    if ($rv === 0 && !empty($tmp[0])) {
+        $gitBranch = trim((string) $tmp[0]);
+    }
+    $tmp = [];
+    $rv = 0;
+    exec('cd ' . escapeshellarg($projectRoot) . ' && git rev-parse --short HEAD 2>&1', $tmp, $rv);
+    if ($rv === 0 && !empty($tmp[0])) {
+        $gitCommit = trim((string) $tmp[0]);
+    }
+    $tmp = [];
+    $rv = 0;
+    exec('cd ' . escapeshellarg($projectRoot) . ' && git remote get-url origin 2>&1', $tmp, $rv);
+    if ($rv === 0 && !empty($tmp[0])) {
+        $gitRemote = trim((string) $tmp[0]);
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+    if (!isset($_POST['csrf_token']) || !verifyCsrfToken((string) $_POST['csrf_token'])) {
+        $statusMessage = 'Sesi tidak valid atau telah kadaluarsa. Silakan refresh halaman dan coba lagi.';
+        $statusType = 'error';
+        $action = '';
+    }
     
     if ($action === 'check') {
         $configuredUrl = defined('GEMBOK_UPDATE_VERSION_URL') ? (string) GEMBOK_UPDATE_VERSION_URL : '';
@@ -83,9 +114,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'update') {
         $output = [];
         $returnVar = 0;
-        $projectRoot = realpath(dirname(__DIR__));
-        $gitDir = $projectRoot ? $projectRoot . DIRECTORY_SEPARATOR . '.git' : '';
-        $isGitRepo = $gitDir !== '' && is_dir($gitDir);
 
         if (!$isGitRepo) {
             $output[] = 'Gagal update otomatis: folder aplikasi ini bukan repository Git (.git tidak ditemukan).';
@@ -249,6 +277,14 @@ ob_start();
     </div>
     <div class="card-body">
         <p>Versi Terpasang: <strong><?php echo htmlspecialchars($localVersion); ?></strong></p>
+        <p style="color: var(--text-muted); margin-top: 6px;">
+            Repo: <strong><?php echo $isGitRepo ? 'Git' : 'Non-Git'; ?></strong>
+            <?php if ($isGitRepo): ?>
+                <?php if ($gitBranch): ?> · Branch: <strong><?php echo htmlspecialchars($gitBranch); ?></strong><?php endif; ?>
+                <?php if ($gitCommit): ?> · Commit: <strong><?php echo htmlspecialchars($gitCommit); ?></strong><?php endif; ?>
+                <?php if ($gitRemote): ?> · Origin: <strong><?php echo htmlspecialchars($gitRemote); ?></strong><?php endif; ?>
+            <?php endif; ?>
+        </p>
         
         <?php if ($statusMessage): ?>
             <div class="alert alert-<?php echo $statusType === 'success' ? 'success' : ($statusType === 'error' ? 'error' : 'info'); ?>" style="white-space: pre-line;">
@@ -258,6 +294,7 @@ ob_start();
         
         <form method="POST" style="margin-bottom: 15px;">
             <input type="hidden" name="action" value="check">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <button type="submit" class="btn btn-secondary">
                 <i class="fas fa-search"></i> Cek Versi di Server Update
             </button>
@@ -265,6 +302,7 @@ ob_start();
         
         <form method="POST" onsubmit="return confirm('Jalankan git pull untuk update aplikasi?\nPastikan sudah backup terlebih dahulu.');">
             <input type="hidden" name="action" value="update">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-download"></i> Jalankan Update (git pull)
             </button>
