@@ -161,9 +161,9 @@ ob_start();
             </div>
             
             <?php if ($currentInvoice['status'] === 'unpaid'): ?>
-                <button class="btn btn-primary" onclick="payInvoice(<?php echo $currentInvoice['id']; ?>)">
+                <a class="btn btn-primary" href="payment.php?invoice_id=<?php echo (int) $currentInvoice['id']; ?>">
                     <i class="fas fa-credit-card"></i> Bayar Sekarang
-                </button>
+                </a>
             <?php endif; ?>
         <?php else: ?>
             <p style="color: var(--text-muted);">Belum ada tagihan bulan ini.</p>

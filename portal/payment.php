@@ -8,6 +8,9 @@ requireCustomerLogin();
 
 $pageTitle = 'Pembayaran';
 
+$customerSession = getCurrentCustomer();
+$customerId = (int) ($customerSession['id'] ?? 0);
+
 // Get invoice ID
 $invoiceId = (int)($_GET['invoice_id'] ?? 0);
 
@@ -17,7 +20,7 @@ if ($invoiceId === 0) {
 }
 
 // Get invoice details
-$invoice = fetchOne("SELECT i.*, c.name as customer_name, c.phone as customer_phone, p.name as package_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id LEFT JOIN packages p ON i.package_id = p.id WHERE i.id = ?", [$invoiceId]);
+$invoice = fetchOne("SELECT i.*, c.name as customer_name, c.phone as customer_phone, p.name as package_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id LEFT JOIN packages p ON c.package_id = p.id WHERE i.id = ? AND i.customer_id = ?", [$invoiceId, $customerId]);
 
 if (!$invoice) {
     setFlash('error', 'Invoice tidak ditemukan');
@@ -25,7 +28,10 @@ if (!$invoice) {
 }
 
 // Get default payment gateway from settings
-$defaultGateway = fetchOne("SELECT setting_value FROM settings WHERE setting_key = ?", ['DEFAULT_PAYMENT_GATEWAY'])['setting_value'] ?? 'tripay';
+$defaultGateway = getSetting('DEFAULT_PAYMENT_GATEWAY', 'tripay');
+if (!in_array($defaultGateway, ['tripay', 'midtrans'], true)) {
+    $defaultGateway = 'tripay';
+}
 
 // Get payment gateways
 require_once '../includes/payment.php';
@@ -66,6 +72,19 @@ if ($defaultGateway === 'tripay') {
 $selectedPaymentMethod = $_POST['payment_method'] ?? '';
 $paymentLink = null;
 
+$supportPhone = (string) getSiteSetting('contact_phone', '+62 812-3456-7890');
+$supportEmail = (string) getSiteSetting('contact_email', 'support@gembok.net');
+$waDigits = preg_replace('/\D+/', '', $supportPhone);
+if ($waDigits !== '') {
+    if (strpos($waDigits, '0') === 0) {
+        $waDigits = '62' . substr($waDigits, 1);
+    } elseif (strpos($waDigits, '62') !== 0) {
+        $waDigits = '62' . $waDigits;
+    }
+}
+$supportWaUrl = $waDigits !== '' ? ('https://wa.me/' . $waDigits) : '#';
+$supportMailto = $supportEmail !== '' ? ('mailto:' . $supportEmail) : '#';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Verify CSRF token
     if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
@@ -90,8 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         
         if ($result['success']) {
-            $paymentLink = $result['link'];
             logActivity('PAYMENT_LINK_GENERATED', "Invoice: {$invoice['invoice_number']}, Gateway: {$defaultGateway}, Method: {$selectedPaymentMethod}");
+            $paymentLink = $result['link'] ?? '';
+            if ($paymentLink !== '') {
+                redirect($paymentLink);
+            }
+            setFlash('error', 'Gagal membuka payment gateway');
         } else {
             setFlash('error', $result['message'] ?? 'Gagal generate payment link');
         }
@@ -128,7 +151,7 @@ ob_start();
                     <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
                         Pilih metode pembayaran untuk invoice ini:
                     </p>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div class="payment-method-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
                         <?php foreach ($paymentMethods as $method): ?>
                             <div class="payment-method-option" 
                                  style="border: 2px solid var(--border-color); 
@@ -196,10 +219,10 @@ ob_start();
         <p>Butuh bantuan? Hubungi Layanan Pelanggan kami:</p>
         <p>
             <i class="fab fa-whatsapp" style="color: #25D366;"></i> 
-            <a href="https://wa.me/6281234567890" style="color: var(--text-primary); text-decoration: none;">+62 812-3456-7890</a>
+            <a href="<?php echo htmlspecialchars($supportWaUrl); ?>" style="color: var(--text-primary); text-decoration: none;"><?php echo htmlspecialchars($supportPhone); ?></a>
             &nbsp;|&nbsp; 
             <i class="fas fa-envelope" style="color: var(--neon-cyan);"></i> 
-            <a href="mailto:support@gembok.net" style="color: var(--text-primary); text-decoration: none;">support@gembok.net</a>
+            <a href="<?php echo htmlspecialchars($supportMailto); ?>" style="color: var(--text-primary); text-decoration: none;"><?php echo htmlspecialchars($supportEmail); ?></a>
         </p>
     </div>
 </div>
@@ -290,6 +313,16 @@ ob_start();
 .alert-success { background: rgba(0, 255, 0, 0.1); border: 1px solid #00ff00; color: #00ff00; }
 .alert-error { background: rgba(255, 0, 0, 0.1); border: 1px solid #ff0000; color: #ff0000; }
 .gateway-option:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,245,255,0.2); }
+
+@media (max-width: 520px) {
+    .payment-method-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+    .payment-method-option {
+        padding: 12px !important;
+    }
+}
 </style>
 
 <script>
