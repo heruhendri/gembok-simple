@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $lastErrorMessage = 'Unknown';
             foreach ($urlsToTry as $url) {
-                $remoteContent = @file_get_contents($url, false, $context);
+                $remoteContent = fetchRemoteVersionContent($url, $context);
                 if ($remoteContent !== false) {
                     $remoteVersion = trim($remoteContent);
                     if ($remoteVersion === '') {
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$isGitRepo) {
             $output[] = 'Gagal update otomatis: folder aplikasi ini bukan repository Git (.git tidak ditemukan).';
-            $output[] = 'Solusi: deploy ulang dari source Git atau update manual dengan upload file rilis terbaru.';
+            $output[] = 'Solusi: gunakan "Inisialisasi Git" atau "Update via ZIP" pada halaman ini.';
             $returnVar = 1;
         } else {
             $statusOut = [];
@@ -138,147 +138,490 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if ($returnVar === 0) {
-            require_once '../includes/db.php';
-            try {
-                $pdo = getDB();
-                
-                // --- Sales Portal Migration ---
-                
-                // Add bill_discount to sales_users
-                try {
-                    $pdo->query("SELECT bill_discount FROM sales_users LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN bill_discount DECIMAL(15,2) DEFAULT 2000 AFTER status");
-                    $output[] = "Added column: bill_discount to sales_users";
-                }
-                
-                // Fix sales_transactions type
-                try {
-                    $stmt = $pdo->query("SHOW COLUMNS FROM sales_transactions LIKE 'type'");
-                    $col = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if (strpos($col['Type'], 'enum') !== false) {
-                        $pdo->exec("ALTER TABLE sales_transactions MODIFY type VARCHAR(50) NOT NULL");
-                        $output[] = "Updated column type: sales_transactions.type to VARCHAR";
-                    }
-                } catch (Exception $e) {
-                    // Table might not exist yet, create it
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS sales_transactions (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        sales_user_id INT NOT NULL,
-                        type VARCHAR(50) NOT NULL,
-                        amount DECIMAL(15,2) NOT NULL,
-                        description TEXT,
-                        related_username VARCHAR(100),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                        FOREIGN KEY (sales_user_id) REFERENCES sales_users(id) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                    $output[] = "Created table: sales_transactions";
-                }
-                
-                // Ensure updated_at exists
-                $tables = ['sales_transactions', 'hotspot_sales', 'sales_users'];
-                foreach($tables as $tbl) {
-                    try {
-                        $pdo->query("SELECT updated_at FROM $tbl LIMIT 1");
-                    } catch (Exception $e) {
-                        $pdo->exec("ALTER TABLE $tbl ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
-                        $output[] = "Added column: updated_at to $tbl";
-                    }
-                }
-                
-                // Ensure voucher columns exist on sales_users
-                try {
-                    $pdo->query("SELECT voucher_mode FROM sales_users LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_mode VARCHAR(20) DEFAULT 'mix' AFTER status");
-                    $output[] = "Added column: voucher_mode to sales_users";
-                }
-                try {
-                    $pdo->query("SELECT voucher_length FROM sales_users LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_length INT DEFAULT 6 AFTER voucher_mode");
-                    $output[] = "Added column: voucher_length to sales_users";
-                }
-                try {
-                    $pdo->query("SELECT voucher_type FROM sales_users LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_type VARCHAR(20) DEFAULT 'upp' AFTER voucher_length");
-                    $output[] = "Added column: voucher_type to sales_users";
-                }
-                
-                try {
-                    $pdo->query("SELECT id FROM site_settings LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        setting_key VARCHAR(50) UNIQUE NOT NULL,
-                        setting_value TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                    $output[] = "Created table: site_settings";
-                    
-                    // Insert default data for site_settings
-                    $siteSettings = [
-                        ['hero_title', 'Internet Cepat <br>Tanpa Batas'],
-                        ['hero_description', 'Nikmati koneksi internet fiber optic super cepat, stabil, dan unlimited untuk kebutuhan rumah maupun bisnis Anda. Gabung sekarang!'],
-                        ['contact_phone', '+62 812-3456-7890'],
-                        ['contact_email', 'info@gembok.net'],
-                        ['contact_address', 'Jakarta, Indonesia'],
-                        ['footer_about', 'Penyedia layanan internet terpercaya dengan jaringan fiber optic berkualitas untuk menunjang aktivitas digital Anda.']
-                    ];
-                    
-                    foreach ($siteSettings as $ss) {
-                        $stmt = $pdo->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
-                        $stmt->execute($ss);
-                    }
-                }
-
-                try {
-                    $pdo->query("SELECT id FROM hotspot_voucher_orders LIMIT 1");
-                } catch (Exception $e) {
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS hotspot_voucher_orders (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        order_number VARCHAR(50) UNIQUE NOT NULL,
-                        customer_name VARCHAR(100) NOT NULL,
-                        customer_phone VARCHAR(20) NOT NULL,
-                        profile_name VARCHAR(100) NOT NULL,
-                        amount DECIMAL(15,2) NOT NULL,
-                        payment_gateway VARCHAR(20) NOT NULL DEFAULT 'tripay',
-                        payment_method VARCHAR(100) DEFAULT NULL,
-                        payment_link TEXT,
-                        payment_reference VARCHAR(100) DEFAULT NULL,
-                        payment_payload LONGTEXT,
-                        status ENUM('pending','paid','failed','expired') DEFAULT 'pending',
-                        paid_at DATETIME DEFAULT NULL,
-                        voucher_username VARCHAR(100) DEFAULT NULL,
-                        voucher_password VARCHAR(100) DEFAULT NULL,
-                        voucher_generated_at DATETIME DEFAULT NULL,
-                        fulfillment_status ENUM('pending','success','failed') DEFAULT 'pending',
-                        fulfillment_error TEXT,
-                        whatsapp_status ENUM('pending','sent','failed') DEFAULT 'pending',
-                        whatsapp_sent_at DATETIME DEFAULT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                    $output[] = "Created table: hotspot_voucher_orders";
-                }
-
-                $stmt = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
-                $stmt->execute(['PUBLIC_VOUCHER_PREFIX', 'VCH-']);
-                $stmt->execute(['PUBLIC_VOUCHER_LENGTH', '6']);
-                
-                $output[] = "Database migration completed.";
-                
-            } catch (Exception $e) {
-                $output[] = "Database migration failed: " . $e->getMessage();
-            }
+            runDatabaseMigrations($output);
         }
         
         $statusMessage = implode("\n", $output);
         $statusType = $returnVar === 0 ? 'success' : 'error';
+    } elseif ($action === 'migrate') {
+        $output = [];
+        runDatabaseMigrations($output);
+        $statusMessage = implode("\n", $output);
+        $statusType = 'success';
+    } elseif ($action === 'init_git') {
+        $output = [];
+        $rv = runGitBootstrapUpdate($projectRoot, $output);
+        if ($rv === 0) {
+            runDatabaseMigrations($output);
+        }
+        $statusMessage = implode("\n", $output);
+        $statusType = $rv === 0 ? 'success' : 'error';
+    } elseif ($action === 'zip_update') {
+        $output = [];
+        $rv = runZipUpdate($projectRoot, $output);
+        if ($rv === 0) {
+            runDatabaseMigrations($output);
+        }
+        $statusMessage = implode("\n", $output);
+        $statusType = $rv === 0 ? 'success' : 'error';
     }
+}
+
+function runDatabaseMigrations(&$output)
+{
+    if (!is_array($output)) {
+        $output = [];
+    }
+    require_once '../includes/db.php';
+    try {
+        $pdo = getDB();
+
+        try {
+            $pdo->query("SELECT bill_discount FROM sales_users LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("ALTER TABLE sales_users ADD COLUMN bill_discount DECIMAL(15,2) DEFAULT 2000 AFTER status");
+            $output[] = "Added column: bill_discount to sales_users";
+        }
+
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM sales_transactions LIKE 'type'");
+            $col = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (strpos($col['Type'], 'enum') !== false) {
+                $pdo->exec("ALTER TABLE sales_transactions MODIFY type VARCHAR(50) NOT NULL");
+                $output[] = "Updated column type: sales_transactions.type to VARCHAR";
+            }
+        } catch (Exception $e) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS sales_transactions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sales_user_id INT NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                amount DECIMAL(15,2) NOT NULL,
+                description TEXT,
+                related_username VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (sales_user_id) REFERENCES sales_users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $output[] = "Created table: sales_transactions";
+        }
+
+        $tables = ['sales_transactions', 'hotspot_sales', 'sales_users'];
+        foreach($tables as $tbl) {
+            try {
+                $pdo->query("SELECT updated_at FROM $tbl LIMIT 1");
+            } catch (Exception $e) {
+                $pdo->exec("ALTER TABLE $tbl ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+                $output[] = "Added column: updated_at to $tbl";
+            }
+        }
+
+        try {
+            $pdo->query("SELECT voucher_mode FROM sales_users LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_mode VARCHAR(20) DEFAULT 'mix' AFTER status");
+            $output[] = "Added column: voucher_mode to sales_users";
+        }
+        try {
+            $pdo->query("SELECT voucher_length FROM sales_users LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_length INT DEFAULT 6 AFTER voucher_mode");
+            $output[] = "Added column: voucher_length to sales_users";
+        }
+        try {
+            $pdo->query("SELECT voucher_type FROM sales_users LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("ALTER TABLE sales_users ADD COLUMN voucher_type VARCHAR(20) DEFAULT 'upp' AFTER voucher_length");
+            $output[] = "Added column: voucher_type to sales_users";
+        }
+
+        try {
+            $pdo->query("SELECT id FROM site_settings LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                setting_key VARCHAR(50) UNIQUE NOT NULL,
+                setting_value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $output[] = "Created table: site_settings";
+
+            $siteSettings = [
+                ['hero_title', 'Internet Cepat <br>Tanpa Batas'],
+                ['hero_description', 'Nikmati koneksi internet fiber optic super cepat, stabil, dan unlimited untuk kebutuhan rumah maupun bisnis Anda. Gabung sekarang!'],
+                ['contact_phone', '+62 812-3456-7890'],
+                ['contact_email', 'info@gembok.net'],
+                ['contact_address', 'Jakarta, Indonesia'],
+                ['footer_about', 'Penyedia layanan internet terpercaya dengan jaringan fiber optic berkualitas untuk menunjang aktivitas digital Anda.']
+            ];
+            foreach ($siteSettings as $ss) {
+                $stmt = $pdo->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
+                $stmt->execute($ss);
+            }
+        }
+
+        try {
+            $pdo->query("SELECT id FROM hotspot_voucher_orders LIMIT 1");
+        } catch (Exception $e) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS hotspot_voucher_orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                order_number VARCHAR(50) UNIQUE NOT NULL,
+                customer_name VARCHAR(100) NOT NULL,
+                customer_phone VARCHAR(20) NOT NULL,
+                profile_name VARCHAR(100) NOT NULL,
+                amount DECIMAL(15,2) NOT NULL,
+                payment_gateway VARCHAR(20) NOT NULL DEFAULT 'tripay',
+                payment_method VARCHAR(100) DEFAULT NULL,
+                payment_link TEXT,
+                payment_reference VARCHAR(100) DEFAULT NULL,
+                payment_payload LONGTEXT,
+                status ENUM('pending','paid','failed','expired') DEFAULT 'pending',
+                paid_at DATETIME DEFAULT NULL,
+                voucher_username VARCHAR(100) DEFAULT NULL,
+                voucher_password VARCHAR(100) DEFAULT NULL,
+                voucher_generated_at DATETIME DEFAULT NULL,
+                fulfillment_status ENUM('pending','success','failed') DEFAULT 'pending',
+                fulfillment_error TEXT,
+                whatsapp_status ENUM('pending','sent','failed') DEFAULT 'pending',
+                whatsapp_sent_at DATETIME DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $output[] = "Created table: hotspot_voucher_orders";
+        }
+
+        $stmt = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
+        $stmt->execute(['PUBLIC_VOUCHER_PREFIX', 'VCH-']);
+        $stmt->execute(['PUBLIC_VOUCHER_LENGTH', '6']);
+
+        $output[] = "Database migration completed.";
+    } catch (Exception $e) {
+        $output[] = "Database migration failed: " . $e->getMessage();
+    }
+}
+
+function fetchRemoteVersionContent($url, $context = null)
+{
+    $url = trim((string) $url);
+    if ($url === '') {
+        return false;
+    }
+
+    $content = @file_get_contents($url, false, $context);
+    if ($content !== false) {
+        return $content;
+    }
+
+    if (!function_exists('curl_init')) {
+        return false;
+    }
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 7);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'User-Agent: GEMBOK-Updater'
+    ]);
+    $res = curl_exec($ch);
+    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($res === false) {
+        return false;
+    }
+    if ($http < 200 || $http >= 300) {
+        return false;
+    }
+    return $res;
+}
+
+function getUpdateRepoRemoteUrl()
+{
+    $configured = '';
+    if (defined('GEMBOK_UPDATE_GIT_REMOTE')) {
+        $configured = trim((string) constant('GEMBOK_UPDATE_GIT_REMOTE'));
+    }
+    if ($configured !== '') {
+        return $configured;
+    }
+    $configured = trim((string) getSetting('UPDATE_GIT_REMOTE', ''));
+    if ($configured !== '') {
+        return $configured;
+    }
+    return 'https://github.com/alijayanet/gembok-simple.git';
+}
+
+function runGitBootstrapUpdate($projectRoot, &$output)
+{
+    $output[] = 'Menyiapkan update via Git...';
+    if (!function_exists('exec')) {
+        $output[] = 'Fungsi exec() tidak tersedia di server ini.';
+        return 1;
+    }
+    $projectRoot = (string) $projectRoot;
+    if ($projectRoot === '' || !is_dir($projectRoot)) {
+        $output[] = 'Project root tidak valid.';
+        return 1;
+    }
+
+    $tmp = [];
+    $rv = 0;
+    exec('git --version 2>&1', $tmp, $rv);
+    if ($rv !== 0) {
+        $output[] = 'Git tidak tersedia di server ini.';
+        $output = array_merge($output, $tmp);
+        return 1;
+    }
+
+    $remote = getUpdateRepoRemoteUrl();
+    if ($remote === '') {
+        $output[] = 'Remote Git tidak dikonfigurasi.';
+        return 1;
+    }
+
+    $cmds = [
+        'cd ' . escapeshellarg($projectRoot) . ' && git init 2>&1',
+        'cd ' . escapeshellarg($projectRoot) . ' && (git remote get-url origin >/dev/null 2>&1 && git remote set-url origin ' . escapeshellarg($remote) . ' || git remote add origin ' . escapeshellarg($remote) . ') 2>&1',
+        'cd ' . escapeshellarg($projectRoot) . ' && git fetch --depth=1 origin main 2>&1',
+        'cd ' . escapeshellarg($projectRoot) . ' && git checkout -B main FETCH_HEAD 2>&1'
+    ];
+
+    foreach ($cmds as $cmd) {
+        $step = [];
+        $stepRv = 0;
+        exec($cmd, $step, $stepRv);
+        $output = array_merge($output, $step);
+        if ($stepRv !== 0) {
+            $output[] = 'Gagal menjalankan perintah git.';
+            return 1;
+        }
+    }
+
+    $statusOut = [];
+    $statusRv = 0;
+    exec('cd ' . escapeshellarg($projectRoot) . ' && git status --porcelain 2>&1', $statusOut, $statusRv);
+    if ($statusRv === 0 && !empty($statusOut)) {
+        $output[] = 'Masih ada perubahan lokal setelah checkout. Update git pull akan diblok untuk keamanan.';
+        $output = array_merge($output, $statusOut);
+        return 1;
+    }
+
+    $pullOut = [];
+    $pullRv = 0;
+    exec('cd ' . escapeshellarg($projectRoot) . ' && git pull --ff-only 2>&1', $pullOut, $pullRv);
+    $output = array_merge($output, $pullOut);
+    if ($pullRv !== 0) {
+        $output[] = 'Git pull gagal.';
+        return 1;
+    }
+
+    $output[] = 'Update via Git berhasil.';
+    return 0;
+}
+
+function runZipUpdate($projectRoot, &$output)
+{
+    $output[] = 'Menyiapkan update via ZIP...';
+    $projectRoot = (string) $projectRoot;
+    if ($projectRoot === '' || !is_dir($projectRoot)) {
+        $output[] = 'Project root tidak valid.';
+        return 1;
+    }
+    if (!class_exists('ZipArchive')) {
+        $output[] = 'ZipArchive tidak tersedia di server ini.';
+        return 1;
+    }
+    if (!function_exists('curl_init') && !ini_get('allow_url_fopen')) {
+        $output[] = 'Tidak bisa download ZIP (cURL tidak tersedia dan allow_url_fopen off).';
+        return 1;
+    }
+
+    $zipUrl = trim((string) getSetting('UPDATE_ZIP_URL', ''));
+    if ($zipUrl === '') {
+        $zipUrl = 'https://codeload.github.com/alijayanet/gembok-simple/zip/refs/heads/main';
+    }
+
+    $baseTmp = $projectRoot . DIRECTORY_SEPARATOR . 'tmp';
+    if (!is_dir($baseTmp)) {
+        @mkdir($baseTmp, 0777, true);
+    }
+    if (!is_dir($baseTmp)) {
+        $output[] = 'Gagal membuat folder tmp.';
+        return 1;
+    }
+
+    $stamp = date('Ymd_His') . '_' . bin2hex(random_bytes(3));
+    $workDir = $baseTmp . DIRECTORY_SEPARATOR . 'update_' . $stamp;
+    $zipPath = $workDir . DIRECTORY_SEPARATOR . 'release.zip';
+    $extractDir = $workDir . DIRECTORY_SEPARATOR . 'extract';
+    @mkdir($extractDir, 0777, true);
+    if (!is_dir($extractDir)) {
+        $output[] = 'Gagal menyiapkan folder extract.';
+        return 1;
+    }
+
+    $downloadOk = downloadFile($zipUrl, $zipPath);
+    if (!$downloadOk || !is_file($zipPath) || filesize($zipPath) < 1000) {
+        $output[] = 'Gagal download ZIP dari: ' . $zipUrl;
+        deleteDirectory($workDir);
+        return 1;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath) !== true) {
+        $output[] = 'Gagal membuka ZIP.';
+        deleteDirectory($workDir);
+        return 1;
+    }
+    $zip->extractTo($extractDir);
+    $zip->close();
+
+    $rootDir = '';
+    foreach (scandir($extractDir) as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $candidate = $extractDir . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($candidate)) {
+            $rootDir = $candidate;
+            break;
+        }
+    }
+    if ($rootDir === '') {
+        $output[] = 'Gagal menemukan root folder dari ZIP.';
+        deleteDirectory($workDir);
+        return 1;
+    }
+
+    $excludes = [
+        '.git',
+        'uploads',
+        'logs',
+        'backups',
+        'tmp',
+        'includes' . DIRECTORY_SEPARATOR . 'config.php',
+        'includes' . DIRECTORY_SEPARATOR . 'installed.lock'
+    ];
+
+    $copyRv = copyTree($rootDir, $projectRoot, $excludes, $output);
+    deleteDirectory($workDir);
+    if ($copyRv !== 0) {
+        $output[] = 'Update via ZIP gagal (copy file).';
+        return 1;
+    }
+    $output[] = 'Update via ZIP berhasil.';
+    return 0;
+}
+
+function downloadFile($url, $destPath)
+{
+    $url = trim((string) $url);
+    if ($url === '') {
+        return false;
+    }
+    $destDir = dirname($destPath);
+    if (!is_dir($destDir)) {
+        @mkdir($destDir, 0777, true);
+    }
+    if (function_exists('curl_init')) {
+        $fp = fopen($destPath, 'wb');
+        if (!$fp) {
+            return false;
+        }
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: GEMBOK-Updater']);
+        $ok = curl_exec($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        fclose($fp);
+        if (!$ok || $http < 200 || $http >= 300) {
+            @unlink($destPath);
+            return false;
+        }
+        return true;
+    }
+    $data = @file_get_contents($url);
+    if ($data === false) {
+        return false;
+    }
+    return file_put_contents($destPath, $data) !== false;
+}
+
+function copyTree($fromDir, $toDir, $excludeRelativePaths, &$output)
+{
+    $fromDir = rtrim((string) $fromDir, "\\/") . DIRECTORY_SEPARATOR;
+    $toDir = rtrim((string) $toDir, "\\/") . DIRECTORY_SEPARATOR;
+    $excludeSet = [];
+    foreach ((array) $excludeRelativePaths as $ex) {
+        $ex = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string) $ex);
+        $excludeSet[$ex] = true;
+    }
+
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($fromDir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($it as $item) {
+        $src = (string) $item->getPathname();
+        $rel = substr($src, strlen($fromDir));
+        $relNorm = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
+
+        foreach ($excludeSet as $ex => $unused) {
+            if ($relNorm === $ex || strpos($relNorm, $ex . DIRECTORY_SEPARATOR) === 0) {
+                continue 2;
+            }
+        }
+
+        $dest = $toDir . $relNorm;
+        if ($item->isDir()) {
+            if (!is_dir($dest)) {
+                @mkdir($dest, 0777, true);
+            }
+            continue;
+        }
+        $parent = dirname($dest);
+        if (!is_dir($parent)) {
+            @mkdir($parent, 0777, true);
+        }
+        if (!@copy($src, $dest)) {
+            $output[] = 'Gagal copy: ' . $rel;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+function deleteDirectory($dir)
+{
+    $dir = (string) $dir;
+    if ($dir === '' || !is_dir($dir)) {
+        return;
+    }
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($it as $item) {
+        if ($item->isDir()) {
+            @rmdir($item->getPathname());
+        } else {
+            @unlink($item->getPathname());
+        }
+    }
+    @rmdir($dir);
 }
 
 ob_start();
@@ -313,18 +656,44 @@ ob_start();
             </button>
         </form>
         
-        <form method="POST" onsubmit="return confirm('Jalankan git pull untuk update aplikasi?\nPastikan sudah backup terlebih dahulu.');">
-            <input type="hidden" name="action" value="update">
+        <?php if ($isGitRepo): ?>
+            <form method="POST" onsubmit="return confirm('Jalankan git pull untuk update aplikasi?\nPastikan sudah backup terlebih dahulu.');">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-download"></i> Jalankan Update (git pull)
+                </button>
+            </form>
+        <?php else: ?>
+            <form method="POST" onsubmit="return confirm('Inisialisasi Git pada folder aplikasi ini dan update dari GitHub?\nFile config.php dan installed.lock tidak akan ikut terhapus.');">
+                <input type="hidden" name="action" value="init_git">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-code-branch"></i> Inisialisasi Git & Update
+                </button>
+            </form>
+            <form method="POST" style="margin-top: 12px;" onsubmit="return confirm('Update via download ZIP (tanpa Git)?\nPastikan permission file/folder mencukupi.');">
+                <input type="hidden" name="action" value="zip_update">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <button type="submit" class="btn btn-secondary">
+                    <i class="fas fa-file-archive"></i> Update via ZIP
+                </button>
+            </form>
+        <?php endif; ?>
+
+        <form method="POST" style="margin-top: 12px;" onsubmit="return confirm('Jalankan migrasi database sekarang?\nGunakan ini setelah update manual/ZIP.');">
+            <input type="hidden" name="action" value="migrate">
             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-download"></i> Jalankan Update (git pull)
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-database"></i> Jalankan Migrasi Database
             </button>
         </form>
         
         <p style="margin-top: 15px; color: var(--text-muted); font-size: 0.9rem;">
             Catatan:
-            <br>- Update akan menjalankan perintah <code>git pull</code> di folder aplikasi.
+            <br>- Jika repo sudah Git, update memakai <code>git pull</code>.
             <br>- Pastikan server memiliki akses git dan izin file yang benar.
+            <br>- Jika instalasi dari ZIP, bisa gunakan <strong>Inisialisasi Git & Update</strong> atau <strong>Update via ZIP</strong>.
             <br>- Untuk cek versi terbaru, aplikasi otomatis menggunakan <code>GEMBOK_UPDATE_VERSION_URL</code> dari config.php yang mengarah ke file <code>version.txt</code> di GitHub.
             <br>- Setelah instalasi awal, hapus file <code>install.sh</code> dari server jika pernah digunakan, agar tidak dijalankan ulang dan mengganggu data yang sudah ada.
         </p>
