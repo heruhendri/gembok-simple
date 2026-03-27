@@ -106,6 +106,14 @@ try {
             case 'mt_hotspot_del':
                 handleHotspotDelCallback($chatId, $callbackData, $callbackQuery);
                 break;
+
+            case 'mt_hotspot_add_menu':
+                handleHotspotAddMenu($chatId);
+                break;
+
+            case 'mt_hotspot_add_pick':
+                handleHotspotAddPickCallback($chatId, $callbackData, $callbackQuery);
+                break;
             
             case 'mikrotik_menu':
                 handleMikrotikMenu($chatId);
@@ -243,6 +251,7 @@ function handleHelp($chatId) {
         $message .= "/pppoe_enable &lt;user&gt; - Aktifkan PPPoE\n";
         $message .= "/pppoe_profile_list\n";
         $message .= "/hs_list - Daftar user Hotspot\n";
+        $message .= "/hs_addmenu - Tambah Hotspot (menu)\n";
         $message .= "/hs_add &lt;user&gt; &lt;pass&gt; &lt;profile&gt; - Tambah Hotspot\n";
         $message .= "/hs_del &lt;user&gt; - Hapus Hotspot\n";
     }
@@ -505,6 +514,10 @@ function handleCommand($chatId, $text) {
         
         case '/hs_add':
             handleHotspotAdd($chatId, $args);
+            break;
+
+        case '/hs_addmenu':
+            handleHotspotAddMenu($chatId);
             break;
         
         case '/hs_del':
@@ -874,7 +887,8 @@ function handleMikrotikMenu($chatId) {
         'inline_keyboard' => [
             [['text' => '📊 Resource', 'callback_data' => 'action=mt_resource'], ['text' => '📡 Online PPPoE', 'callback_data' => 'action=mt_online']],
             [['text' => '📶 Ping IP/Host', 'callback_data' => 'action=mt_ping_help']],
-            [['text' => '👤 PPPoE Commands', 'callback_data' => 'action=mt_pppoe_help'], ['text' => '🌐 Hotspot Commands', 'callback_data' => 'action=mt_hotspot_help']]
+            [['text' => '👤 PPPoE Commands', 'callback_data' => 'action=mt_pppoe_help'], ['text' => '🌐 Hotspot Commands', 'callback_data' => 'action=mt_hotspot_help']],
+            [['text' => '➕ Add Hotspot User', 'callback_data' => 'action=mt_hotspot_add_menu']]
         ]
     ];
     sendMessage($chatId, "Menu MikroTik Admin:", ['reply_markup' => $keyboard]);
@@ -970,7 +984,68 @@ function handleMikrotikPppoeHelp($chatId) {
 }
 
 function handleMikrotikHotspotHelp($chatId) {
-    $msg = "🌐 *Hotspot Commands*\n/hs_list\n/hs_add &lt;u&gt; &lt;p&gt; &lt;prof&gt;\n/hs_del &lt;u&gt;";
+    $msg = "🌐 *Hotspot Commands*\n/hs_list\n/hs_addmenu\n/hs_add &lt;u&gt; &lt;p&gt; &lt;prof&gt;\n/hs_del &lt;u&gt;";
+    sendMessage($chatId, $msg);
+}
+
+function handleHotspotAddMenu($chatId) {
+    if (!isAdminChat($chatId)) return;
+
+    $catalog = getPublicVoucherCatalog();
+    if (empty($catalog)) {
+        sendMessage($chatId, "Tidak ada profile hotspot yang punya harga (seperti voucher publik). Pastikan Hotspot User Profile di MikroTik punya script on-login dengan price/selling_price.");
+        return;
+    }
+
+    $message = "➕ *Tambah User Hotspot*\n\nPilih profile (yang ada harganya saja):";
+    $keyboard = ['inline_keyboard' => []];
+
+    $row = [];
+    $count = 0;
+    foreach ($catalog as $item) {
+        $profileName = (string) ($item['profile_name'] ?? '');
+        if ($profileName === '') {
+            continue;
+        }
+        $price = (int) ($item['price'] ?? 0);
+        $label = $profileName;
+        if ($price > 0) {
+            $label .= ' - ' . formatCurrency($price);
+        }
+        $row[] = ['text' => $label, 'callback_data' => 'action=mt_hotspot_add_pick&profile=' . urlencode($profileName)];
+        if (count($row) === 1) {
+            $keyboard['inline_keyboard'][] = $row;
+            $row = [];
+        }
+        $count++;
+        if ($count >= 15) {
+            break;
+        }
+    }
+    if (!empty($row)) {
+        $keyboard['inline_keyboard'][] = $row;
+    }
+    $keyboard['inline_keyboard'][] = [['text' => 'Batal', 'callback_data' => 'action=mikrotik_menu']];
+
+    sendMessage($chatId, $message, ['reply_markup' => $keyboard]);
+}
+
+function handleHotspotAddPickCallback($chatId, $data, $callbackQuery) {
+    if (!isAdminChat($chatId)) return;
+
+    $callbackQueryId = $callbackQuery['id'] ?? null;
+    answerCallbackQuery($callbackQueryId);
+
+    $profile = trim((string) ($data['profile'] ?? ''));
+    if ($profile === '') {
+        sendMessage($chatId, "Profile tidak valid.");
+        return;
+    }
+
+    $profileEscaped = htmlspecialchars($profile, ENT_QUOTES, 'UTF-8');
+    $msg = "Profile dipilih: <b>{$profileEscaped}</b>\n\n";
+    $msg .= "Kirim perintah ini (ganti USER/PASS):\n";
+    $msg .= "<code>/hs_add USER PASS {$profileEscaped}</code>";
     sendMessage($chatId, $msg);
 }
 
@@ -1134,8 +1209,12 @@ function handleHotspotAdd($chatId, $args) {
         sendMessage($chatId, "Format: /hs_add &lt;u&gt; &lt;p&gt; &lt;prof&gt;");
         return;
     }
-    
-    if (mikrotikAddHotspotUser($parts[0], $parts[1], $parts[2])) {
+
+    $profile = $parts[2];
+    $ts = date('YmdHis');
+    $comment = "parent:{$profile} vc-tg-{$chatId}-{$ts}";
+
+    if (mikrotikAddHotspotUser($parts[0], $parts[1], $profile, ['comment' => $comment])) {
         sendMessage($chatId, "User Hotspot ditambahkan.");
     } else {
         sendMessage($chatId, "Gagal.");

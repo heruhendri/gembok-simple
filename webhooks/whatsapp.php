@@ -1112,8 +1112,11 @@ function handleWhatsAppHotspotAdd($phone, $args) {
     $user = $parts[0];
     $pass = $parts[1];
     $profile = $parts[2];
-    
-    $ok = mikrotikAddHotspotUser($user, $pass, $profile);
+
+    $phoneDigits = preg_replace('/\D+/', '', (string) $phone);
+    $ts = date('YmdHis');
+    $comment = "parent:{$profile} vc-wa-{$phoneDigits}-{$ts}";
+    $ok = mikrotikAddHotspotUser($user, $pass, $profile, ['comment' => $comment]);
     if ($ok) {
         sendWhatsAppResponse($phone, "User Hotspot {$user} berhasil ditambahkan dengan profile {$profile}.");
     } else {
