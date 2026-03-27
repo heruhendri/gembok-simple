@@ -120,8 +120,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $output[] = 'Solusi: deploy ulang dari source Git atau update manual dengan upload file rilis terbaru.';
             $returnVar = 1;
         } else {
-            $cmd = 'cd ' . escapeshellarg($projectRoot) . ' && git pull 2>&1';
-            exec($cmd, $output, $returnVar);
+            $statusOut = [];
+            $statusRv = 0;
+            exec('cd ' . escapeshellarg($projectRoot) . ' && git status --porcelain 2>&1', $statusOut, $statusRv);
+            if ($statusRv !== 0) {
+                $output[] = 'Gagal cek status git.';
+                $output = array_merge($output, $statusOut);
+                $returnVar = 1;
+            } elseif (!empty($statusOut)) {
+                $output[] = 'Update dibatalkan karena ada perubahan lokal di server.';
+                $output[] = 'Solusi: commit/stash dulu, atau deploy ulang dari Git.';
+                $output = array_merge($output, $statusOut);
+                $returnVar = 1;
+            } else {
+                exec('cd ' . escapeshellarg($projectRoot) . ' && git pull --ff-only 2>&1', $output, $returnVar);
+            }
         }
         
         if ($returnVar === 0) {
