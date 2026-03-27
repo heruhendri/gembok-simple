@@ -251,6 +251,9 @@ function handleHelp($chatId) {
 }
 
 function handleRegularMessage($chatId, $text) {
+    $trimmedText = trim((string)$text);
+    logActivity('TELEGRAM_MESSAGE', "From: {$chatId}, Len: " . strlen($trimmedText));
+
     $message = "Terima kasih atas pesan Anda.\n\n";
     $message .= "Untuk menggunakan bot ini, silakan gunakan command yang tersedia.\n";
     $message .= "Ketik /help untuk melihat daftar command.";
@@ -287,8 +290,12 @@ function sendMessage($chatId, $text, $options = []) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     
     $response = curl_exec($ch);
+    if ($response === false) {
+        $curlError = curl_error($ch);
+        logError("Telegram sendMessage curl error: {$curlError}");
+    }
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     
     logActivity('TELEGRAM_SEND', "To: {$chatId}, Status code: {$httpCode}");
     
@@ -322,11 +329,56 @@ function editMessageText($chatId, $messageId, $text, $replyMarkup = null) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     
     $response = curl_exec($ch);
+    if ($response === false) {
+        $curlError = curl_error($ch);
+        logError("Telegram editMessageText curl error: {$curlError}");
+    }
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     
     logActivity('TELEGRAM_EDIT', "To: {$chatId}, Msg: {$messageId}, Status code: {$httpCode}");
     
+    return $httpCode === 200;
+}
+
+function answerCallbackQuery($callbackQueryId, $text = null, $showAlert = false) {
+    if (empty(TELEGRAM_BOT_TOKEN)) {
+        logError('Telegram bot token not configured');
+        return false;
+    }
+
+    if ($callbackQueryId === null || $callbackQueryId === '') {
+        return false;
+    }
+
+    $url = "https://api.telegram.org/bot" . TELEGRAM_BOT_TOKEN . "/answerCallbackQuery";
+
+    $data = [
+        'callback_query_id' => $callbackQueryId,
+        'show_alert' => $showAlert ? 'true' : 'false'
+    ];
+
+    if ($text !== null && $text !== '') {
+        $data['text'] = $text;
+    }
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+    $response = curl_exec($ch);
+    if ($response === false) {
+        $curlError = curl_error($ch);
+        logError("Telegram answerCallbackQuery curl error: {$curlError}");
+    }
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    unset($ch);
+
+    logActivity('TELEGRAM_ANSWER_CALLBACK', "Status code: {$httpCode}");
+
     return $httpCode === 200;
 }
 
@@ -1046,6 +1098,9 @@ function handlePppoeEnableCallback($chatId, $data) {
 }
 
 function handlePppoeDelCallback($chatId, $data, $callbackQuery) {
+    $callbackQueryId = $callbackQuery['id'] ?? null;
+    answerCallbackQuery($callbackQueryId);
+
     handlePppoeDel($chatId, $data['name'] ?? '', true);
     sendMessage($chatId, "User dihapus.");
 }
@@ -1097,6 +1152,9 @@ function handleHotspotDel($chatId, $args, $silent = false) {
 }
 
 function handleHotspotDelCallback($chatId, $data, $callbackQuery) {
+    $callbackQueryId = $callbackQuery['id'] ?? null;
+    answerCallbackQuery($callbackQueryId);
+
     handleHotspotDel($chatId, $data['name'] ?? '', true);
     sendMessage($chatId, "User dihapus.");
 }
