@@ -329,7 +329,7 @@ function fetchRemoteVersionContent($url, $context = null)
     ]);
     $res = curl_exec($ch);
     $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
 
     if ($res === false) {
         return false;
@@ -544,7 +544,7 @@ function downloadFile($url, $destPath)
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: GEMBOK-Updater']);
         $ok = curl_exec($ch);
         $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        unset($ch);
         fclose($fp);
         if (!$ok || $http < 200 || $http >= 300) {
             @unlink($destPath);
@@ -579,7 +579,7 @@ function copyTree($fromDir, $toDir, $excludeRelativePaths, &$output)
         $rel = substr($src, strlen($fromDir));
         $relNorm = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
 
-        foreach ($excludeSet as $ex => $unused) {
+        foreach ($excludeSet as $ex => $_) {
             if ($relNorm === $ex || strpos($relNorm, $ex . DIRECTORY_SEPARATOR) === 0) {
                 continue 2;
             }
