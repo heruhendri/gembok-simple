@@ -20,7 +20,7 @@ function sendTelegramNotify($token, $chatId, $message) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     
     $result = curl_exec($ch);
-    curl_close($ch);
+    unset($ch);
     
     return $result;
 }

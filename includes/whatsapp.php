@@ -16,7 +16,7 @@ function getWhatsAppSetting($key, $constantValue) {
     try {
         $row = fetchOne("SELECT setting_value FROM settings WHERE setting_key = ?", [$key]);
         return $row ? $row['setting_value'] : '';
-    } catch (Exception $e) {
+    } catch (Exception $_) {
         return '';
     }
 }
@@ -28,7 +28,7 @@ function logWhatsAppError($message)
 
 // Fonnte WhatsApp Sender
 function sendFonnteWhatsApp($phone, $message) {
-    $token = getWhatsAppSetting('FONNTE_API_TOKEN', defined('FONNTE_API_TOKEN') ? FONNTE_API_TOKEN : '');
+    $token = getWhatsAppSetting('FONNTE_API_TOKEN', defined('FONNTE_API_TOKEN') ? constant('FONNTE_API_TOKEN') : '');
     
     if (empty($token)) {
         return ['success' => false, 'message' => 'Fonnte API token not configured'];
@@ -55,7 +55,7 @@ function sendFonnteWhatsApp($phone, $message) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     
     if ($httpCode === 200) {
         return ['success' => true, 'data' => json_decode($response, true)];
@@ -68,7 +68,7 @@ function sendFonnteWhatsApp($phone, $message) {
 
 // Wablas WhatsApp Sender
 function sendWablasWhatsApp($phone, $message) {
-    $token = getWhatsAppSetting('WABLAS_API_TOKEN', defined('WABLAS_API_TOKEN') ? WABLAS_API_TOKEN : '');
+    $token = getWhatsAppSetting('WABLAS_API_TOKEN', defined('WABLAS_API_TOKEN') ? constant('WABLAS_API_TOKEN') : '');
     
     if (empty($token)) {
         return ['success' => false, 'message' => 'Wablas API token not configured'];
@@ -92,7 +92,7 @@ function sendWablasWhatsApp($phone, $message) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     
     if ($httpCode === 200) {
         return ['success' => true, 'data' => json_decode($response, true)];
@@ -105,7 +105,7 @@ function sendWablasWhatsApp($phone, $message) {
 
 // MPWA WhatsApp Sender
 function sendMpwaWhatsApp($phone, $message) {
-    $token = getWhatsAppSetting('MPWA_API_KEY', defined('MPWA_API_KEY') ? MPWA_API_KEY : '');
+    $token = getWhatsAppSetting('MPWA_API_KEY', defined('MPWA_API_KEY') ? constant('MPWA_API_KEY') : '');
     
     if (empty($token)) {
         logWhatsAppError("SENDER_ERROR: MPWA API key not configured");
@@ -113,14 +113,14 @@ function sendMpwaWhatsApp($phone, $message) {
     }
     
     // Sender number: nomor HP yang sudah di-scan QR di dashboard MPWA
-    $sender = getWhatsAppSetting('MPWA_SENDER', defined('MPWA_SENDER') ? MPWA_SENDER : '');
+    $sender = getWhatsAppSetting('MPWA_SENDER', defined('MPWA_SENDER') ? constant('MPWA_SENDER') : '');
     
     if (empty($sender)) {
         logWhatsAppError("SENDER_ERROR: MPWA sender number not configured");
         return ['success' => false, 'message' => 'MPWA sender number not configured'];
     }
     
-    $url = getWhatsAppSetting('MPWA_API_URL', defined('MPWA_API_URL') ? MPWA_API_URL : '');
+    $url = getWhatsAppSetting('MPWA_API_URL', defined('MPWA_API_URL') ? constant('MPWA_API_URL') : '');
     $url = trim((string) $url);
     if ($url === '') {
         $url = 'https://mpwa.official.id/api/send';
@@ -151,7 +151,7 @@ function sendMpwaWhatsApp($phone, $message) {
     $curlError = curl_error($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-    curl_close($ch);
+    unset($ch);
     
     if ($response === false || $httpCode === 0) {
         $errorMsg = "Failed to send WhatsApp via MPWA (HTTP $httpCode, cURL $curlErrno): $curlError";

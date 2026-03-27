@@ -41,7 +41,7 @@ function paymentGetConfig($key, $default = '')
         if ($row && ($row['setting_value'] ?? '') !== '') {
             return $row['setting_value'];
         }
-    } catch (Exception $e) {
+    } catch (Exception $_) {
     }
 
     try {
@@ -52,7 +52,7 @@ function paymentGetConfig($key, $default = '')
         if ($row && ($row['setting_value'] ?? '') !== '') {
             return $row['setting_value'];
         }
-    } catch (Exception $e) {
+    } catch (Exception $_) {
     }
 
     return $default;
@@ -151,7 +151,7 @@ function paymentTripayRequest($path, $method, $apiKey, $payload = null, $baseUrl
     $redirectCount = curl_getinfo($ch, CURLINFO_REDIRECT_COUNT);
     $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
     $error = curl_error($ch);
-    curl_close($ch);
+    unset($ch);
 
     return [
         'url' => $url,
@@ -207,6 +207,10 @@ function generateTripayPaymentLink($invoiceNumber, $amount, $customerName, $cust
     $amountInt = (int) $amount;
     $method = paymentNormalizeTripayMethod($paymentMethod);
     $expiredTime = time() + (24 * 60 * 60);
+    $dueTs = strtotime((string) $dueDate);
+    if ($dueTs !== false && $dueTs > time()) {
+        $expiredTime = min($expiredTime, (int) $dueTs);
+    }
     $signature = hash_hmac('sha256', $merchantCode . $merchantRef . $amountInt, $privateKey);
 
     $payload = [
@@ -328,6 +332,15 @@ function generateMidtransPaymentLink($invoiceNumber, $amount, $customerName, $cu
     $orderId = (string) $invoiceNumber;
     $amountInt = (int) $amount;
 
+    $durationHours = 24;
+    $dueTs = strtotime((string) $dueDate);
+    if ($dueTs !== false && $dueTs > time()) {
+        $diffHours = (int) ceil(((int) $dueTs - time()) / 3600);
+        if ($diffHours > 0 && $diffHours < $durationHours) {
+            $durationHours = $diffHours;
+        }
+    }
+
     $payload = [
         'transaction_details' => [
             'order_id' => $orderId,
@@ -349,7 +362,7 @@ function generateMidtransPaymentLink($invoiceNumber, $amount, $customerName, $cu
         'expiry' => [
             'start_time' => date('Y-m-d H:i:s O'),
             'unit' => 'hour',
-            'duration' => 24
+            'duration' => $durationHours
         ]
     ];
 
@@ -380,7 +393,7 @@ function generateMidtransPaymentLink($invoiceNumber, $amount, $customerName, $cu
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
 
     if ($httpCode !== 201 && $httpCode !== 200) {
         return ['success' => false, 'message' => 'Gagal membuat transaksi Midtrans', 'link' => null];
@@ -421,6 +434,7 @@ function getPaymentGateways() {
 // Send payment reminder via WhatsApp
 function sendPaymentReminder($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate) {
     $message = "Halo {$customerName},\n\n";
+    $message .= "No Invoice: {$invoiceNumber}\n";
     $message .= "Tagihan internet Anda akan jatuh tempo pada " . formatDate($dueDate) . "\n\n";
     $message .= "Nominal: " . formatCurrency($amount) . "\n\n";
     $message .= "Mohon segera lakukan pembayaran untuk mengaktifkan kembali koneksi internet Anda.\n\n";
@@ -484,7 +498,7 @@ function getMidtransPaymentStatus($orderId) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     
     if ($httpCode !== 200) {
         return ['success' => false, 'message' => 'Failed to get payment status'];
