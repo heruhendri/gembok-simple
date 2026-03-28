@@ -12,6 +12,7 @@ if (!file_exists(__DIR__ . '/includes/installed.lock')) {
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/functions.php';
+require_once 'includes/auth.php';
 
 // Fetch Packages
 $packages = [];
@@ -70,8 +71,7 @@ $templateFiles = [
 // Validate template selection
 $templateFile = isset($templateFiles[$landingTemplate]) ? $templateFiles[$landingTemplate] : $templateFiles['neon'];
 
-$usePretty = (string) getSetting('USE_PRETTY_URLS', '1') === '1';
-$voucherOrderUrl = rtrim(APP_URL, '/') . ($usePretty ? '/voucher' : '/voucher-order.php');
+$voucherOrderUrl = rtrim(APP_URL, '/') . '/voucher-order.php';
 
 ob_start();
 if (file_exists(__DIR__ . '/' . $templateFile)) {
@@ -81,11 +81,14 @@ if (file_exists(__DIR__ . '/' . $templateFile)) {
 }
 $html = ob_get_clean();
 
-$voucherButton = '<a href="' . htmlspecialchars($voucherOrderUrl, ENT_QUOTES, 'UTF-8') . '" style="position:fixed;right:16px;bottom:16px;z-index:9999;background:#22d3ee;color:#0f172a;padding:10px 14px;border-radius:999px;font-weight:700;text-decoration:none;box-shadow:0 8px 20px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:13px;">Order Voucher</a>';
-if (stripos($html, '</body>') !== false) {
-    $html = preg_replace('/<\/body>/i', $voucherButton . '</body>', $html, 1);
-} else {
-    $html .= $voucherButton;
+$showVoucherButton = !isAdminLoggedIn() && !isSalesLoggedIn() && !isTechnicianLoggedIn() && !isCustomerLoggedIn();
+if ($showVoucherButton) {
+    $voucherButton = '<a href="' . htmlspecialchars($voucherOrderUrl, ENT_QUOTES, 'UTF-8') . '" style="position:fixed;right:16px;bottom:16px;z-index:9999;background:#22d3ee;color:#0f172a;padding:10px 14px;border-radius:999px;font-weight:700;text-decoration:none;box-shadow:0 8px 20px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:13px;">Order Voucher</a>';
+    if (stripos($html, '</body>') !== false) {
+        $html = preg_replace('/<\/body>/i', $voucherButton . '</body>', $html, 1);
+    } else {
+        $html .= $voucherButton;
+    }
 }
 echo $html;
 ?>
