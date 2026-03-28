@@ -286,6 +286,117 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 redirect('settings.php');
                 break;
+            
+            case 'test_telegram':
+                $token = trim((string) getSetting('TELEGRAM_BOT_TOKEN', ''));
+                $chatId = trim((string) getSetting('TELEGRAM_ADMIN_CHAT_ID', ''));
+                if ($token === '' || $chatId === '') {
+                    setFlash('error', 'Telegram Bot Token dan Admin Chat ID wajib diisi untuk test.');
+                    redirect('settings.php');
+                }
+                $url = 'https://api.telegram.org/bot' . $token . '/sendMessage';
+                $payload = [
+                    'chat_id' => $chatId,
+                    'text' => 'Test Telegram GEMBOK ' . date('Y-m-d H:i:s'),
+                    'parse_mode' => 'HTML'
+                ];
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                $response = curl_exec($ch);
+                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErrno = (int) curl_errno($ch);
+                $curlError = (string) curl_error($ch);
+                unset($ch);
+                $decoded = json_decode((string) $response, true);
+                if ($curlErrno !== 0 || $httpCode === 0) {
+                    setFlash('error', 'Test Telegram gagal (HTTP ' . $httpCode . ', cURL ' . $curlErrno . '): ' . $curlError);
+                } elseif (is_array($decoded) && ($decoded['ok'] ?? false) === true) {
+                    setFlash('success', 'Test Telegram berhasil dikirim ke Chat ID: ' . $chatId);
+                } else {
+                    $msg = is_array($decoded) ? (string) ($decoded['description'] ?? 'Unknown error') : 'Unknown error';
+                    setFlash('error', 'Test Telegram gagal (HTTP ' . $httpCode . '): ' . $msg);
+                }
+                redirect('settings.php');
+                break;
+
+            case 'telegram_set_webhook':
+                $token = trim((string) getSetting('TELEGRAM_BOT_TOKEN', ''));
+                if ($token === '') {
+                    setFlash('error', 'Telegram Bot Token belum diisi.');
+                    redirect('settings.php');
+                }
+                $webhookUrl = rtrim(APP_URL, '/') . '/webhooks/telegram.php';
+                if (stripos($webhookUrl, 'localhost') !== false || stripos($webhookUrl, '127.0.0.1') !== false) {
+                    setFlash('error', 'APP_URL masih localhost. Telegram tidak bisa mengakses webhook lokal. Gunakan domain/IP publik + HTTPS atau tunnel (ngrok/cloudflared).');
+                    redirect('settings.php');
+                }
+                $url = 'https://api.telegram.org/bot' . $token . '/setWebhook';
+                $payload = ['url' => $webhookUrl];
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+                $response = curl_exec($ch);
+                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErrno = (int) curl_errno($ch);
+                $curlError = (string) curl_error($ch);
+                unset($ch);
+                $decoded = json_decode((string) $response, true);
+                if ($curlErrno !== 0 || $httpCode === 0) {
+                    setFlash('error', 'setWebhook gagal (HTTP ' . $httpCode . ', cURL ' . $curlErrno . '): ' . $curlError);
+                } elseif (is_array($decoded) && ($decoded['ok'] ?? false) === true) {
+                    setFlash('success', 'Webhook Telegram berhasil di-set ke: ' . $webhookUrl);
+                } else {
+                    $msg = is_array($decoded) ? (string) ($decoded['description'] ?? 'Unknown error') : 'Unknown error';
+                    setFlash('error', 'setWebhook gagal (HTTP ' . $httpCode . '): ' . $msg);
+                }
+                redirect('settings.php');
+                break;
+
+            case 'telegram_webhook_info':
+                $token = trim((string) getSetting('TELEGRAM_BOT_TOKEN', ''));
+                if ($token === '') {
+                    setFlash('error', 'Telegram Bot Token belum diisi.');
+                    redirect('settings.php');
+                }
+                $url = 'https://api.telegram.org/bot' . $token . '/getWebhookInfo';
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                $response = curl_exec($ch);
+                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErrno = (int) curl_errno($ch);
+                $curlError = (string) curl_error($ch);
+                unset($ch);
+                $decoded = json_decode((string) $response, true);
+                if ($curlErrno !== 0 || $httpCode === 0) {
+                    setFlash('error', 'getWebhookInfo gagal (HTTP ' . $httpCode . ', cURL ' . $curlErrno . '): ' . $curlError);
+                } elseif (!is_array($decoded) || ($decoded['ok'] ?? false) !== true) {
+                    $msg = is_array($decoded) ? (string) ($decoded['description'] ?? 'Unknown error') : 'Unknown error';
+                    setFlash('error', 'getWebhookInfo gagal (HTTP ' . $httpCode . '): ' . $msg);
+                } else {
+                    $result = $decoded['result'] ?? [];
+                    $currentUrl = (string) ($result['url'] ?? '');
+                    $pending = (int) ($result['pending_update_count'] ?? 0);
+                    $lastError = (string) ($result['last_error_message'] ?? '');
+                    $msg = 'Webhook URL: ' . ($currentUrl !== '' ? $currentUrl : '(kosong)') . ' | Pending: ' . $pending;
+                    if ($lastError !== '') {
+                        $msg .= ' | Last error: ' . $lastError;
+                    }
+                    setFlash('success', $msg);
+                }
+                redirect('settings.php');
+                break;
                 
             case 'save_landing':
                 // Auto create table if not exists (lazy migration)
@@ -767,6 +878,30 @@ ob_start();
             <i class="fas fa-save"></i> Simpan Telegram
         </button>
     </form>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;">
+        <form method="POST" style="margin: 0;">
+            <input type="hidden" name="action" value="test_telegram">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-paper-plane"></i> Test Kirim Telegram
+            </button>
+        </form>
+        <form method="POST" style="margin: 0;">
+            <input type="hidden" name="action" value="telegram_webhook_info">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-info-circle"></i> Cek Webhook
+            </button>
+        </form>
+        <form method="POST" style="margin: 0;">
+            <input type="hidden" name="action" value="telegram_set_webhook">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+            <button type="submit" class="btn btn-warning">
+                <i class="fas fa-link"></i> Set Webhook
+            </button>
+        </form>
+    </div>
 </div>
 
 <!-- WhatsApp Settings -->
