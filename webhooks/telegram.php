@@ -62,6 +62,18 @@ try {
             case 'billing_menu':
                 handleBillingMenu($chatId);
                 break;
+
+            case 'billing_picklist':
+                handleBillingCustomerPicker($chatId, $callbackData);
+                break;
+
+            case 'billing_pick':
+                handleBillingCustomerPickCallback($chatId, $callbackData, $callbackQuery);
+                break;
+
+            case 'billing_show_invoices':
+                handleBillingInvoicesByCustomerCallback($chatId, $callbackData, $callbackQuery);
+                break;
                 
             case 'billing_help_cek':
                 handleBillingHelpCek($chatId);
@@ -565,15 +577,18 @@ function handleBillingMenu($chatId) {
     $keyboard = [
         'inline_keyboard' => [
             [
-                ['text' => '📄 Cek Tagihan', 'callback_data' => 'action=billing_help_cek'],
-                ['text' => '📜 Daftar Invoice', 'callback_data' => 'action=billing_help_invoice']
+                ['text' => '📄 Cek Tagihan', 'callback_data' => 'action=billing_picklist&mode=cek&page=1'],
+                ['text' => '📜 Daftar Invoice', 'callback_data' => 'action=billing_picklist&mode=invoice&page=1']
             ],
             [
-                ['text' => '🔒 Isolir Pelanggan', 'callback_data' => 'action=billing_help_isolir'],
-                ['text' => '🔓 Buka Isolir', 'callback_data' => 'action=billing_help_bukaisolir']
+                ['text' => '🔒 Isolir Pelanggan', 'callback_data' => 'action=billing_picklist&mode=isolir&page=1'],
+                ['text' => '🔓 Buka Isolir', 'callback_data' => 'action=billing_picklist&mode=buka&page=1']
             ],
             [
                 ['text' => '✅ Tandai Lunas', 'callback_data' => 'action=billing_help_lunas']
+            ],
+            [
+                ['text' => '⬅️ Kembali', 'callback_data' => 'action=menu']
             ]
         ]
     ];
@@ -638,10 +653,11 @@ function handleBillingCheck($chatId, $args) {
     $options = [];
     if ($invoice) {
         $buttons = [];
-        $buttons[] = [['text' => '📜 Daftar Invoice', 'callback_data' => 'action=billing_help_invoice']];
+        $buttons[] = [['text' => '📜 Daftar Invoice', 'callback_data' => 'action=billing_show_invoices&cid=' . urlencode((string) $customer['id'])]];
         if ($invoice['status'] !== 'paid') {
             $buttons[] = [['text' => '✅ Tandai Lunas', 'callback_data' => 'action=billing_mark_paid&inv=' . urlencode($invoice['invoice_number'])]];
         }
+        $buttons[] = [['text' => '⬅️ Menu Billing', 'callback_data' => 'action=billing_menu']];
         $options['reply_markup'] = ['inline_keyboard' => $buttons];
     }
     sendMessage($chatId, $message, $options);
@@ -684,6 +700,155 @@ function handleBillingInvoice($chatId, $args) {
     } else {
         sendMessage($chatId, $message, ['reply_markup' => $keyboard]);
     }
+}
+
+function handleBillingCustomerPicker($chatId, $data) {
+    if (!isAdminChat($chatId)) return;
+
+    $mode = strtolower(trim((string) ($data['mode'] ?? 'cek')));
+    $page = (int) ($data['page'] ?? 1);
+    if ($page < 1) $page = 1;
+
+    $where = [];
+    $params = [];
+    if ($mode === 'buka') {
+        $where[] = "status = 'isolated'";
+    } elseif ($mode === 'isolir') {
+        $where[] = "status = 'active'";
+    }
+
+    $sql = "SELECT id, name, pppoe_username, status FROM customers";
+    if (!empty($where)) {
+        $sql .= " WHERE " . implode(' AND ', $where);
+    }
+    $sql .= " ORDER BY name ASC LIMIT 400";
+    $customers = fetchAll($sql, $params);
+
+    if (empty($customers)) {
+        sendMessage($chatId, "Tidak ada pelanggan untuk ditampilkan.", [
+            'reply_markup' => ['inline_keyboard' => [[['text' => '⬅️ Menu Billing', 'callback_data' => 'action=billing_menu']]]]
+        ]);
+        return;
+    }
+
+    $perPage = 12;
+    $total = count($customers);
+    $totalPages = (int) ceil($total / $perPage);
+    if ($totalPages < 1) $totalPages = 1;
+    if ($page > $totalPages) $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
+    $items = array_slice($customers, $offset, $perPage);
+
+    $title = 'Pilih Pelanggan';
+    if ($mode === 'cek') $title = 'Pilih Pelanggan (Cek Tagihan)';
+    if ($mode === 'invoice') $title = 'Pilih Pelanggan (Daftar Invoice)';
+    if ($mode === 'isolir') $title = 'Pilih Pelanggan (Isolir)';
+    if ($mode === 'buka') $title = 'Pilih Pelanggan (Buka Isolir)';
+
+    $message = "👤 *{$title}*\nHalaman {$page}/{$totalPages}";
+    $keyboard = ['inline_keyboard' => []];
+    $row = [];
+
+    foreach ($items as $c) {
+        $cid = (string) ($c['id'] ?? '');
+        $name = (string) ($c['name'] ?? '');
+        $pppoe = (string) ($c['pppoe_username'] ?? '');
+        if ($cid === '' || $pppoe === '') {
+            continue;
+        }
+        $label = $name !== '' ? $name : $pppoe;
+        if (mb_strlen($label) > 18) {
+            $label = mb_substr($label, 0, 18) . '…';
+        }
+        $row[] = ['text' => $label, 'callback_data' => 'action=billing_pick&mode=' . urlencode($mode) . '&cid=' . urlencode($cid)];
+        if (count($row) === 2) {
+            $keyboard['inline_keyboard'][] = $row;
+            $row = [];
+        }
+    }
+    if (!empty($row)) {
+        $keyboard['inline_keyboard'][] = $row;
+    }
+
+    $nav = [];
+    if ($page > 1) {
+        $nav[] = ['text' => '⬅️ Prev', 'callback_data' => 'action=billing_picklist&mode=' . urlencode($mode) . '&page=' . ($page - 1)];
+    }
+    if ($page < $totalPages) {
+        $nav[] = ['text' => 'Next ➡️', 'callback_data' => 'action=billing_picklist&mode=' . urlencode($mode) . '&page=' . ($page + 1)];
+    }
+    if (!empty($nav)) {
+        $keyboard['inline_keyboard'][] = $nav;
+    }
+    $keyboard['inline_keyboard'][] = [['text' => '⬅️ Menu Billing', 'callback_data' => 'action=billing_menu']];
+
+    sendMessage($chatId, $message, ['reply_markup' => $keyboard]);
+}
+
+function handleBillingCustomerPickCallback($chatId, $data, $callbackQuery) {
+    if (!isAdminChat($chatId)) return;
+
+    $callbackQueryId = $callbackQuery['id'] ?? null;
+    answerCallbackQuery($callbackQueryId);
+
+    $mode = strtolower(trim((string) ($data['mode'] ?? 'cek')));
+    $cid = (int) ($data['cid'] ?? 0);
+    if ($cid <= 0) {
+        sendMessage($chatId, "Data pelanggan tidak valid.");
+        return;
+    }
+
+    $customer = fetchOne("SELECT * FROM customers WHERE id = ?", [$cid]);
+    if (!$customer) {
+        sendMessage($chatId, "Pelanggan tidak ditemukan.");
+        return;
+    }
+
+    $username = (string) ($customer['pppoe_username'] ?? '');
+    if ($username === '') {
+        sendMessage($chatId, "PPPoE username pelanggan kosong.");
+        return;
+    }
+
+    if ($mode === 'invoice') {
+        handleBillingInvoice($chatId, $username);
+        return;
+    }
+    if ($mode === 'isolir') {
+        handleBillingIsolir($chatId, $username);
+        return;
+    }
+    if ($mode === 'buka') {
+        handleBillingBukaIsolir($chatId, $username);
+        return;
+    }
+
+    handleBillingCheck($chatId, $username);
+}
+
+function handleBillingInvoicesByCustomerCallback($chatId, $data, $callbackQuery) {
+    if (!isAdminChat($chatId)) return;
+
+    $callbackQueryId = $callbackQuery['id'] ?? null;
+    answerCallbackQuery($callbackQueryId);
+
+    $cid = (int) ($data['cid'] ?? 0);
+    if ($cid <= 0) {
+        sendMessage($chatId, "Data pelanggan tidak valid.");
+        return;
+    }
+
+    $customer = fetchOne("SELECT * FROM customers WHERE id = ?", [$cid]);
+    if (!$customer) {
+        sendMessage($chatId, "Pelanggan tidak ditemukan.");
+        return;
+    }
+    $username = (string) ($customer['pppoe_username'] ?? '');
+    if ($username === '') {
+        sendMessage($chatId, "PPPoE username pelanggan kosong.");
+        return;
+    }
+    handleBillingInvoice($chatId, $username);
 }
 
 function handleBillingIsolir($chatId, $args) {
@@ -731,7 +896,7 @@ function handleBillingBukaIsolir($chatId, $args) {
         return;
     }
     
-    if (unisolateCustomer($customer['id'])) {
+    if (unisolateCustomer($customer['id'], ['send_whatsapp' => true])) {
         sendMessage($chatId, "Pelanggan {$customer['name']} berhasil dibuka isolirnya.");
     } else {
         sendMessage($chatId, "Gagal membuka isolir pelanggan {$customer['name']}.");
@@ -759,6 +924,7 @@ function handleBillingLunas($chatId, $args, $silent = false) {
     
     $updateData = ['status' => 'paid', 'updated_at' => date('Y-m-d H:i:s'), 'paid_at' => date('Y-m-d H:i:s'), 'payment_method' => 'Telegram Bot'];
     update('invoices', $updateData, 'id = ?', [$invoice['id']]);
+    sendInvoicePaidWhatsapp($invoiceNumber, 'telegram', ['payment_method' => 'Telegram Bot']);
     
     if (isCustomerIsolated($invoice['customer_id'])) {
         unisolateCustomer($invoice['customer_id']);
@@ -837,6 +1003,9 @@ function handleInvoiceEdit($chatId, $args) {
     }
     
     update('invoices', $updateData, 'id = ?', [$invoice['id']]);
+    if ($status === 'paid' && $invoice['status'] !== 'paid') {
+        sendInvoicePaidWhatsapp((string) $invoice['invoice_number'], 'telegram', ['payment_method' => 'Telegram Bot']);
+    }
     sendMessage($chatId, "Invoice diperbarui.");
 }
 

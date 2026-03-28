@@ -570,7 +570,7 @@ function handleWhatsAppBillingBukaIsolir($phone, $args) {
         return;
     }
     
-    if (unisolateCustomer($customer['id'])) {
+    if (unisolateCustomer($customer['id'], ['send_whatsapp' => true])) {
         sendWhatsAppResponse($phone, "Pelanggan {$customer['name']} berhasil dibuka isolirnya.");
     } else {
         sendWhatsAppResponse($phone, "Gagal membuka isolir pelanggan {$customer['name']}.");
@@ -608,6 +608,7 @@ function handleWhatsAppBillingLunas($phone, $args) {
     ];
     
     update('invoices', $updateData, 'id = ?', [$invoice['id']]);
+    sendInvoicePaidWhatsapp($invoiceNumber, 'whatsapp', ['payment_method' => 'WhatsApp Bot']);
     
     if (isCustomerIsolated($invoice['customer_id'])) {
         unisolateCustomer($invoice['customer_id']);
@@ -716,6 +717,9 @@ function handleWhatsAppInvoiceEdit($phone, $args) {
     }
     
     update('invoices', $updateData, 'id = ?', [$invoice['id']]);
+    if ($status === 'paid' && $invoice['status'] !== 'paid') {
+        sendInvoicePaidWhatsapp((string) $invoice['invoice_number'], 'whatsapp', ['payment_method' => 'WhatsApp Bot']);
+    }
     logActivity('EDIT_INVOICE', "Invoice: {$invoice['invoice_number']}");
     
     sendWhatsAppResponse($phone, "Invoice {$invoiceNumber} berhasil diperbarui.");
