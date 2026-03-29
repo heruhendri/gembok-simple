@@ -33,13 +33,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = [
             'name' => $name,
             'shared-users' => $shared,
-            'rate-limit' => $rate,
-            'on-login' => $onLogin,
-            'comment' => $comment,
-            'idle-timeout' => $idle,
-            'address-pool' => ($pool === 'none' ? '' : $pool),
-            'parent-queue' => ($parent === 'none' ? '' : $parent)
+            'on-login' => $onLogin
         ];
+        if ($rate !== '') {
+            $data['rate-limit'] = $rate;
+        }
+        if ($comment !== '') {
+            $data['comment'] = $comment;
+        }
+        if ($idle !== '') {
+            $data['idle-timeout'] = $idle;
+        }
+        if ($pool !== '' && $pool !== 'none') {
+            $data['address-pool'] = $pool;
+        }
+        if ($parent !== '' && $parent !== 'none') {
+            $data['parent-queue'] = $parent;
+        }
 
         if ($action === 'add') {
             if (mikrotikAddHotspotProfile($data)) {
