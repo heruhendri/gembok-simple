@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'publi
         sendWhatsApp($adminDigits, $adminMsg);
     }
 
-    $techs = fetchAll("SELECT phone FROM technician_users WHERE status = 'active' AND phone IS NOT NULL AND phone <> '' LIMIT 3");
+    $techs = fetchAll("SELECT phone FROM technician_users WHERE status = 'active' AND phone IS NOT NULL AND phone <> '' LIMIT 1");
     foreach ($techs as $t) {
         $tDigits = preg_replace('/\D+/', '', (string) ($t['phone'] ?? ''));
         if ($tDigits === '') {
