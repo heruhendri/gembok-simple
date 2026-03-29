@@ -302,6 +302,34 @@ function mikrotikRead($socket)
     return mikrotikReadSentence($socket);
 }
 
+function mikrotikTrapMessageFromResponse($response)
+{
+    if (!is_array($response) || empty($response)) {
+        return '';
+    }
+    $isTrap = false;
+    foreach ($response as $word) {
+        if ($word === '!trap') {
+            $isTrap = true;
+            break;
+        }
+    }
+    if (!$isTrap) {
+        return '';
+    }
+    $parts = [];
+    foreach ($response as $word) {
+        if (strpos($word, '=message=') === 0) {
+            $parts[] = substr($word, 9);
+        } elseif (strpos($word, '=category=') === 0) {
+            $parts[] = 'category=' . substr($word, 10);
+        } elseif (strpos($word, '=reason=') === 0) {
+            $parts[] = 'reason=' . substr($word, 8);
+        }
+    }
+    return implode(' | ', $parts);
+}
+
 function mikrotikQuery($command, $params = [])
 {
     $socket = getMikrotikConnection();
@@ -1176,8 +1204,15 @@ function mikrotikUpdateHotspotProfile($id, $data)
 
     $response = mikrotikReadSentence($socket);
     foreach ($response as $word) {
-        if (strpos($word, '!trap') === 0)
+        if (strpos($word, '!trap') === 0) {
+            $trap = mikrotikTrapMessageFromResponse($response);
+            if ($trap !== '') {
+                logError('MikroTik update hotspot profile failed: ' . $trap);
+            } else {
+                logError('MikroTik update hotspot profile failed.');
+            }
             return false;
+        }
     }
     return true;
 }
@@ -1212,8 +1247,15 @@ function mikrotikAddHotspotProfile($data)
 
     $response = mikrotikReadSentence($socket);
     foreach ($response as $word) {
-        if (strpos($word, '!trap') === 0)
+        if (strpos($word, '!trap') === 0) {
+            $trap = mikrotikTrapMessageFromResponse($response);
+            if ($trap !== '') {
+                logError('MikroTik add hotspot profile failed: ' . $trap);
+            } else {
+                logError('MikroTik add hotspot profile failed.');
+            }
             return false;
+        }
     }
     return true;
 }
@@ -1232,8 +1274,15 @@ function mikrotikDeleteHotspotProfile($id)
     $response = mikrotikReadSentence($socket);
     fclose($socket);
     foreach ($response as $word) {
-        if (strpos($word, '!trap') === 0)
+        if (strpos($word, '!trap') === 0) {
+            $trap = mikrotikTrapMessageFromResponse($response);
+            if ($trap !== '') {
+                logError('MikroTik delete hotspot profile failed: ' . $trap);
+            } else {
+                logError('MikroTik delete hotspot profile failed.');
+            }
             return false;
+        }
     }
     return true;
 }
