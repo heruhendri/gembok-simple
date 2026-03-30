@@ -156,6 +156,8 @@ function runAutoIsolir($pdo)
     echo "Running auto-isolir...\n";
 
     // Get customers with unpaid invoices that are overdue
+    $hasAutoIsolate = ensureCustomersAutoIsolateColumn();
+    $autoIsolateClause = $hasAutoIsolate ? "AND c.auto_isolate = 1" : "";
     $overdueInvoices = fetchAll("
         SELECT c.id, c.name, c.phone, c.pppoe_username, c.package_id, i.invoice_number, i.amount, i.due_date
         FROM customers c
@@ -163,6 +165,7 @@ function runAutoIsolir($pdo)
         WHERE i.status = 'unpaid'
         AND i.due_date < CURDATE()
         AND c.status = 'active'
+        {$autoIsolateClause}
         AND i.due_date = (
             SELECT MIN(i2.due_date)
             FROM invoices i2
@@ -183,6 +186,7 @@ function runAutoIsolir($pdo)
 
             // Send WhatsApp notification
             $message = "Halo {$invoice['name']},\n\nPembayaran internet Anda sudah melewati tanggal jatuh tempo.\n\nTagihan: " . formatCurrency($invoice['amount']) . "\nInvoice: {$invoice['invoice_number']}\n\nMohon segera lakukan pembayaran untuk mengaktifkan kembali koneksi internet Anda.\n\nTerima kasih.";
+            $message .= getWhatsAppFooter();
             sendWhatsApp($invoice['phone'], $message);
 
         } else {
@@ -305,6 +309,7 @@ function sendReminders($pdo)
         $message .= "Jatuh Tempo: " . formatDate($invoice['due_date']) . "\n\n";
         $message .= "Mohon lakukan pembayaran sebelum jatuh tempo untuk menghindari isolir.\n\n";
         $message .= "Terima kasih.";
+        $message .= getWhatsAppFooter();
 
         echo "  Sending reminder to: {$invoice['name']} ({$invoice['phone']})\n";
         sendWhatsApp($invoice['phone'], $message);
