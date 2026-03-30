@@ -21,6 +21,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_excel') {
             p.price as package_price,
             c.status,
             c.isolation_date,
+            c.auto_isolate,
             c.address,
             c.lat,
             c.lng,
@@ -46,7 +47,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_excel') {
     
     // Header row
     echo '<Row>' . "\n";
-    $headers = ['Nama', 'No HP', 'PPPoE Username', 'Paket', 'Status', 'Tgl Isolir', 'Alamat', 'Latitude', 'Longitude'];
+    $headers = ['Nama', 'No HP', 'PPPoE Username', 'Paket', 'Status', 'Tgl Isolir', 'Isolir Otomatis', 'Alamat', 'Latitude', 'Longitude'];
     foreach ($headers as $header) {
         echo '<Cell><Data ss:Type="String">' . htmlspecialchars($header) . '</Data></Cell>' . "\n";
     }
@@ -61,6 +62,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_excel') {
         echo '<Cell><Data ss:Type="String">' . htmlspecialchars($customer['package_name'] ?? 'Tanpa Paket') . '</Data></Cell>' . "\n";
         echo '<Cell><Data ss:Type="String">' . ($customer['status'] == 'active' ? 'Aktif' : 'Isolir') . '</Data></Cell>' . "\n";
         echo '<Cell><Data ss:Type="Number">' . $customer['isolation_date'] . '</Data></Cell>' . "\n";
+        echo '<Cell><Data ss:Type="String">' . ((int)($customer['auto_isolate'] ?? 1) === 1 ? 'Ya' : 'Tidak') . '</Data></Cell>' . "\n";
         echo '<Cell><Data ss:Type="String">' . htmlspecialchars($customer['address'] ?? '') . '</Data></Cell>' . "\n";
         echo '<Cell><Data ss:Type="String">' . ($customer['lat'] ?? '') . '</Data></Cell>' . "\n";
         echo '<Cell><Data ss:Type="String">' . ($customer['lng'] ?? '') . '</Data></Cell>' . "\n";
@@ -86,6 +88,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
             p.price as package_price,
             c.status,
             c.isolation_date,
+            c.auto_isolate,
             c.address,
             c.lat,
             c.lng,
@@ -112,6 +115,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
         'Paket',
         'Status',
         'Tgl Isolir',
+        'Isolir Otomatis',
         'Alamat',
         'Latitude',
         'Longitude'
@@ -126,6 +130,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
             $customer['package_name'] ?? 'Tanpa Paket',
             $customer['status'] == 'active' ? 'Aktif' : 'Isolir',
             $customer['isolation_date'],
+            ((int)($customer['auto_isolate'] ?? 1) === 1 ? 'Ya' : 'Tidak'),
             $customer['address'] ?? '',
             $customer['lat'] ?? '',
             $customer['lng'] ?? ''
@@ -243,6 +248,12 @@ ob_start();
                     <td>Tanggal isolir (1-28)</td>
                     <td>20</td>
                     <td><span class="badge badge-info">Opsional</span></td>
+                </tr>
+                <tr>
+                    <td>Isolir Otomatis</td>
+                    <td>Apakah pelanggan ikut isolir otomatis (Ya/Tidak)</td>
+                    <td>Ya</td>
+                    <td><span class="badge badge-warning">Tidak</span></td>
                 </tr>
                 <tr>
                     <td>Alamat</td>

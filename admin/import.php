@@ -102,16 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($rows as $rowNum => $data) {
             $actualRow = $rowNum + 2; // +2 because row 1 is header
             
-            // Map columns - expected order: Nama, No HP, PPPoE Username, Paket, Status, Tgl Isolir, Alamat, Latitude, Longitude
+            // Map columns - expected order:
+            // Nama, No HP, PPPoE Username, Paket, Status, Tgl Isolir, Isolir Otomatis (opsional), Alamat, Latitude, Longitude
             $name = trim($data[0] ?? '');
             $phone = trim($data[1] ?? '');
             $pppoeUsername = trim($data[2] ?? '');
             $packageName = trim($data[3] ?? '');
             $statusText = trim($data[4] ?? 'Aktif');
             $isolationDate = trim($data[5] ?? '20');
-            $address = trim($data[6] ?? '');
-            $lat = str_replace(',', '.', trim($data[7] ?? ''));
-            $lng = str_replace(',', '.', trim($data[8] ?? ''));
+            $autoIsolateText = trim($data[6] ?? 'Ya');
+            $address = trim($data[7] ?? '');
+            $lat = str_replace(',', '.', trim($data[8] ?? ''));
+            $lng = str_replace(',', '.', trim($data[9] ?? ''));
             
             // Validate required fields
             if (empty($name) || empty($phone) || empty($pppoeUsername)) {
@@ -152,6 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'package_id' => $package['id'],
                 'status' => $status,
                 'isolation_date' => (int)($isolationDate ?: 20),
+                'auto_isolate' => (strtolower($autoIsolateText) === 'tidak' || strtolower($autoIsolateText) === 'no' || $autoIsolateText === '0') ? 0 : 1,
                 'address' => sanitize($address),
                 'lat' => $lat ? (float)$lat : null,
                 'lng' => $lng ? (float)$lng : null,
