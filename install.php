@@ -329,6 +329,7 @@ function createDatabaseTables() {
         package_id INT,
         router_id INT DEFAULT 0,
         status ENUM('active', 'isolated') DEFAULT 'active',
+        auto_isolate TINYINT(1) NOT NULL DEFAULT 1,
         isolation_date INT DEFAULT 20,
         address TEXT,
         lat DECIMAL(11,8),
