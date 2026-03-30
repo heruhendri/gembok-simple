@@ -7,6 +7,7 @@ require_once '../includes/auth.php';
 requireAdminLogin();
 
 $pageTitle = 'Pelanggan';
+$hasAutoIsolate = ensureCustomersAutoIsolateColumn();
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -34,6 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'portal_password' => password_hash('1234', PASSWORD_DEFAULT),
                     'created_at' => date('Y-m-d H:i:s')
                 ];
+                if ($hasAutoIsolate) {
+                    $data['auto_isolate'] = isset($_POST['auto_isolate']) ? 1 : 0;
+                }
                 
                 if (insert('customers', $data)) {
                     // Sync to onu_locations if requested
@@ -108,6 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'installed_by' => !empty($_POST['installed_by']) ? (int)$_POST['installed_by'] : null,
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
+                if ($hasAutoIsolate) {
+                    $data['auto_isolate'] = isset($_POST['auto_isolate']) ? 1 : 0;
+                }
                 
                 if (update('customers', $data, 'id = ?', [$customerId])) {
                     // Sync to onu_locations if requested
@@ -424,6 +431,14 @@ ob_start();
                 <label class="form-label">Tanggal Isolir (1-28)</label>
                 <input type="number" name="isolation_date" class="form-control" value="20" min="1" max="28" required>
             </div>
+
+            <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" name="auto_isolate" value="1" checked>
+                    <span>Isolir Otomatis</span>
+                </label>
+                <small style="color: var(--text-muted);">Jika dimatikan, pelanggan ini akan diabaikan oleh isolir otomatis saat tagihan belum dibayar.</small>
+            </div>
             
             <div class="form-group">
                 <label class="form-label">Alamat</label>
@@ -667,6 +682,14 @@ ob_start();
                 <div class="form-group">
                     <label class="form-label">Tanggal Isolir (1-28)</label>
                     <input type="number" name="isolation_date" id="edit_isolation_date" class="form-control" min="1" max="28" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" name="auto_isolate" id="edit_auto_isolate" value="1">
+                        <span>Isolir Otomatis</span>
+                    </label>
+                    <small style="color: var(--text-muted);">Jika dimatikan, pelanggan ini akan diabaikan oleh isolir otomatis saat tagihan belum dibayar.</small>
                 </div>
                 
                 <div class="form-group">
@@ -944,6 +967,10 @@ function editCustomer(customer) {
     document.getElementById('edit_package_id').value = customer.package_id;
     document.getElementById('edit_router_id').value = customer.router_id || 0;
     document.getElementById('edit_isolation_date').value = customer.isolation_date || 20;
+    const autoIsolate = document.getElementById('edit_auto_isolate');
+    if (autoIsolate) {
+        autoIsolate.checked = String(customer.auto_isolate ?? 1) === '1';
+    }
     document.getElementById('edit_address').value = customer.address || '';
     document.getElementById('edit_lat').value = customer.lat || '';
     document.getElementById('edit_lng').value = customer.lng || '';
