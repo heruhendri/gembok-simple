@@ -1402,40 +1402,71 @@ function mikrotikDeleteHotspotProfile($id)
 }
 
 // Generate Mikhmon v3-style on-login script
-// Mikhmon v3 format: on-login script stores comma-separated values:
-// index[0]=script, [1]=script, [2]=price, [3]=validity, [4]=sellingPrice, [5]=script, [6]=lockUser
-function generateHotspotExpiryScript($mode, $price = 0, $validity = '', $sellingPrice = 0, $lockUser = 'disable')
+// Expected header format (as used by Mikhmon v3):
+// :put (",rem,2000,1d,3000,,Disable,");
+// then actual on-login body script.
+function generateHotspotExpiryScript($mode, $price = 0, $validity = '', $sellingPrice = 0, $lockUser = 'Disable', $compatMode = 'auto')
 {
-    // Mikhmon v3 on-login script structure (simplified)
-    // The comma-separated string stores metadata at fixed positions
-    $script = '';
-
-    if ($mode === 'remove') {
-        // Script that removes user after expiry
-        $script = ':local date [/system clock get date];:local time [/system clock get time];:local uname \$user;';
-        $script .= ':local comment [/ip hotspot user get [find name=\$uname] comment];';
-        $script .= ':if ([:len \$comment] = 0) do={/ip hotspot user set [find name=\$uname] comment="\$date \$time"};';
-    } elseif ($mode === 'notice') {
-        $script = ':local date [/system clock get date];:local time [/system clock get time];:local uname \$user;';
-        $script .= ':local comment [/ip hotspot user get [find name=\$uname] comment];';
-        $script .= ':if ([:len \$comment] = 0) do={/ip hotspot user set [find name=\$uname] comment="\$date \$time"};';
-    } elseif ($mode === 'record') {
-        $script = ':local date [/system clock get date];:local time [/system clock get time];:local uname \$user;';
-        $script .= ':local comment [/ip hotspot user get [find name=\$uname] comment];';
-        $script .= ':if ([:len \$comment] = 0) do={/ip hotspot user set [find name=\$uname] comment="\$date \$time"};';
-    } else {
-        // mode 'none' - only store metadata, no expiry action
-        $script = ':nothing';
-    }
-
     $price = (int) $price;
     $sellingPrice = (int) $sellingPrice;
+    $validity = trim((string) $validity);
+    $compatMode = strtolower(trim((string) $compatMode));
 
-    // Mikhmon v3 comma-separated format at fixed positions:
-    // [0]=script, [1]=(unused), [2]=price, [3]=validity, [4]=sellingPrice, [5]=(unused), [6]=lockUser
-    $onLoginData = $script . ',' . $mode . ',' . $price . ',' . $validity . ',' . $sellingPrice . ',0,' . $lockUser;
+    $mode = strtolower((string) $mode);
+    $modeShort = '0';
+    if ($mode === 'remove') {
+        $modeShort = 'rem';
+    } elseif ($mode === 'notice') {
+        $modeShort = 'not';
+    } elseif ($mode === 'record') {
+        $modeShort = 'rec';
+    }
 
-    return $onLoginData;
+    $interval = $validity !== '' ? $validity : '1d';
+
+    $compatTag = $compatMode;
+    if (!in_array($compatTag, ['auto', 'ros6', 'ros7'], true)) {
+        $compatTag = 'auto';
+    }
+    $meta = ':put (",' . $modeShort . ',' . $price . ',' . $validity . ',' . $sellingPrice . ',,' . $lockUser . ',' . $compatTag . ',");';
+
+    if ($mode === 'none' || $mode === '') {
+        return $meta . ' :nothing';
+    }
+
+    $script = '{:local comment [ /ip hotspot user get [/ip hotspot user find where name="$user"] comment];';
+    $script .= ' :local ucode [:pick $comment 0 2];';
+    $script .= ' :if ($ucode = "vc" or $ucode = "up" or $comment = "") do={';
+    $script .= ' :local date [ /system clock get date ];';
+    $script .= ' :local year "";';
+    if ($compatMode === 'ros7') {
+        $script .= ' :set year [:pick $date 0 4];';
+    } elseif ($compatMode === 'ros6') {
+        $script .= ' :set year [:pick $date 7 11];';
+    } else {
+        $script .= ' :if ([:find $date "-"] != nil) do={ :set year [:pick $date 0 4]; } else={ :set year [:pick $date 7 11]; };';
+    }
+    $script .= ' /sys sch add name="$user" disable=no start-date=$date interval="' . $interval . '";';
+    $script .= ' :delay 5s;';
+    $script .= ' :local exp [ /sys sch get [ /sys sch find where name="$user" ] next-run];';
+    $script .= ' :local getxp [len $exp];';
+    $script .= ' :if ([:find $exp "-"] != nil) do={ /ip hotspot user set comment="$exp" [find where name="$user"]; } else={';
+    $script .= ' :if ($getxp = 15) do={';
+    $script .= ' :local d [:pick $exp 0 6];';
+    $script .= ' :local t [:pick $exp 7 16];';
+    $script .= ' :local s ("/");';
+    $script .= ' :local exp ("$d$s$year $t");';
+    $script .= ' /ip hotspot user set comment="$exp" [find where name="$user"];';
+    $script .= ' };';
+    $script .= ' :if ($getxp = 8) do={ /ip hotspot user set comment="$date $exp" [find where name="$user"]; };';
+    $script .= ' :if ($getxp > 15) do={ /ip hotspot user set comment="$exp" [find where name="$user"]; };';
+    $script .= ' };';
+    $script .= ' :delay 5s;';
+    $script .= ' /sys sch remove [find where name="$user"]';
+    $script .= ' }';
+    $script .= ' }';
+
+    return $meta . ' ' . $script;
 }
 
 // Parse Mikhmon v3 on-login script to extract price, validity, selling price, lock user
@@ -1455,9 +1486,66 @@ function parseMikhmonOnLogin($onLoginScript)
     if (empty($onLoginScript))
         return $data;
 
+    $headerParts = null;
+    if (preg_match('/:put\\s*\\(\\s*"(.*?)"\\s*\\)\\s*;?/i', $onLoginScript, $m)) {
+        $headerParts = explode(',', $m[1]);
+    }
+
+    if (is_array($headerParts) && count($headerParts) >= 2) {
+        // Header example: ",rem,2000,1d,3000,,Disable,auto,"
+        $mode = trim((string) ($headerParts[1] ?? ''));
+        $price = trim((string) ($headerParts[2] ?? '0'));
+        $validity = trim((string) ($headerParts[3] ?? ''));
+        $selling = trim((string) ($headerParts[4] ?? '0'));
+        $datalimit = trim((string) ($headerParts[5] ?? ''));
+        $tail6 = trim((string) ($headerParts[6] ?? ''));
+        $tail7 = trim((string) ($headerParts[7] ?? ''));
+        $tail8 = trim((string) ($headerParts[8] ?? ''));
+
+        if ($mode !== '') {
+            $data['mode'] = $mode;
+        }
+        if (is_numeric($price)) {
+            $data['price'] = (int) $price;
+        }
+        if ($validity !== '') {
+            $data['validity'] = $validity;
+        }
+        if (is_numeric($selling)) {
+            $data['selling_price'] = (int) $selling;
+        }
+        if ($datalimit !== '') {
+            $data['datalimit'] = $datalimit;
+        }
+
+        if (preg_match('/^(Disable|Enable|disable|enable)$/', $tail6)) {
+            $data['lock_user'] = strtolower($tail6);
+        } else {
+            if ($tail6 !== '') {
+                $data['timelimit'] = $tail6;
+            }
+            if (preg_match('/^(Disable|Enable|disable|enable)$/', $tail7)) {
+                $data['lock_user'] = strtolower($tail7);
+            }
+        }
+        $compat = strtolower($tail7);
+        if (in_array($compat, ['auto', 'ros6', 'ros7'], true)) {
+            $data['compat'] = $compat;
+        } else {
+            $compat2 = strtolower($tail8);
+            if (in_array($compat2, ['auto', 'ros6', 'ros7'], true)) {
+                $data['compat'] = $compat2;
+            } else {
+                $data['compat'] = 'auto';
+            }
+        }
+
+        return $data;
+    }
+
     $parts = explode(',', $onLoginScript);
 
-    // Mikhmon v3 indices: [1]=mode, [2]=price, [3]=validity, [4]=sellingPrice, [5]=datalimit, [6]=timelimit, [7]=lockUser
+    // Legacy format (app simplified): script,mode,price,validity,sellingPrice,datalimit,timelimit,lockUser
     if (isset($parts[1]) && !empty($parts[1])) {
         $data['mode'] = $parts[1];
     }
@@ -1479,6 +1567,7 @@ function parseMikhmonOnLogin($onLoginScript)
     if (isset($parts[7]) && !empty($parts[7])) {
         $data['lock_user'] = $parts[7];
     }
+    $data['compat'] = 'auto';
 
     return $data;
 }
