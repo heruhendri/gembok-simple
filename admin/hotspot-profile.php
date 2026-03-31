@@ -20,14 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price = sanitize($_POST['price'] ?? '0');
         $selling = sanitize($_POST['selling_price'] ?? '0');
         $expiry = sanitize($_POST['expiry_mode'] ?? 'none');
+        $compat = sanitize($_POST['ros_compat'] ?? 'auto');
         $pool = sanitize($_POST['address_pool'] ?? 'none');
         $parent = sanitize($_POST['parent_queue'] ?? 'none');
         $idle = sanitize($_POST['idle_timeout'] ?? '');
 
         // Mikhmon v3: Store price/validity/selling in on-login script as comma-separated
-        $onLogin = generateHotspotExpiryScript($expiry, $price, $validity, $selling);
+        $onLogin = generateHotspotExpiryScript($expiry, $price, $validity, $selling, 'Disable', $compat);
 
-        // Comment is kept simple
         $comment = '';
 
         $data = [
@@ -37,9 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         if ($rate !== '') {
             $data['rate-limit'] = $rate;
-        }
-        if ($comment !== '') {
-            $data['comment'] = $comment;
         }
         if ($idle !== '') {
             $data['idle-timeout'] = $idle;
@@ -124,11 +121,11 @@ ob_start();
                 <input type="text" name="validity" id="pValidity" class="form-control" placeholder="1d">
             </div>
             <div class="form-group">
-                <label class="form-label">Price (for MikroTik Comment)</label>
+                <label class="form-label">Harga Dasar</label>
                 <input type="number" name="price" id="pPrice" class="form-control" value="0">
             </div>
             <div class="form-group">
-                <label class="form-label">Selling Price</label>
+                <label class="form-label">Harga Jual</label>
                 <input type="number" name="selling_price" id="pSelling" class="form-control" value="0">
             </div>
             <div class="form-group">
@@ -138,6 +135,14 @@ ob_start();
                     <option value="remove">Remove</option>
                     <option value="notice">Notice</option>
                     <option value="record">Record</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kompatibilitas ROS</label>
+                <select name="ros_compat" id="pCompat" class="form-control">
+                    <option value="auto">Auto</option>
+                    <option value="ros6">ROS 6</option>
+                    <option value="ros7">ROS 7</option>
                 </select>
             </div>
             <div class="form-group">
@@ -244,17 +249,28 @@ ob_start();
         document.getElementById('pShared').value = p['shared-users'] || '1';
         document.getElementById('pRate').value = p['rate-limit'] || '';
 
-        // Parse on-login script for price and validity (Mikhmon v3 format)
-        let price = 0, validity = '', selling = 0;
+        // Parse on-login script for price/validity/selling/compat (Mikhmon v3 format)
+        let price = 0, validity = '', selling = 0, compat = 'auto';
         if (p['on-login']) {
-            const parts = p['on-login'].split(',');
-            if (parts[2]) price = parts[2];
-            if (parts[3]) validity = parts[3];
-            if (parts[4]) selling = parts[4];
+            const m = p['on-login'].match(/:put\s*\(\s*"(.*?)"\s*\)\s*;?/i);
+            if (m && m[1]) {
+                const header = m[1].split(',');
+                if (header[2]) price = header[2];
+                if (header[3]) validity = header[3];
+                if (header[4]) selling = header[4];
+                const c = (header[7] || header[8] || '').toLowerCase();
+                if (c === 'auto' || c === 'ros6' || c === 'ros7') compat = c;
+            } else {
+                const parts = p['on-login'].split(',');
+                if (parts[2]) price = parts[2];
+                if (parts[3]) validity = parts[3];
+                if (parts[4]) selling = parts[4];
+            }
         }
         document.getElementById('pPrice').value = price;
         document.getElementById('pValidity').value = validity;
         document.getElementById('pSelling').value = selling;
+        document.getElementById('pCompat').value = compat;
         document.getElementById('pPool').value = p['address-pool'] || 'none';
         document.getElementById('pParent').value = p['parent-queue'] || 'none';
         document.getElementById('pIdle').value = p['idle-timeout'] || '';
