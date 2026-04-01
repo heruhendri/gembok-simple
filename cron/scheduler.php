@@ -11,6 +11,8 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 
+date_default_timezone_set('Asia/Jakarta');
+
 // CLI Check - Only run if called directly from CLI
 if (php_sapi_name() === 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     runScheduler();
@@ -118,6 +120,14 @@ function calculateNextRun($schedule)
 
     $scheduleDays = $schedule['schedule_days'];
 
+    if ($scheduleDays === 'monthly') {
+        $target = date('Y-m-01') . ' ' . sprintf('%02d:%02d:00', $hour, $minute);
+        if (strtotime($target) <= time()) {
+            $target = date('Y-m-01', strtotime('+1 month')) . ' ' . sprintf('%02d:%02d:00', $hour, $minute);
+        }
+        return date('Y-m-d H:i:s', strtotime($target));
+    }
+
     // Calculate next run date
     $nextRun = date('Y-m-d') . ' ' . sprintf('%02d:%02d:00', $hour, $minute);
 
@@ -201,12 +211,6 @@ function runAutoIsolir($pdo)
 function runAutoInvoice($pdo)
 {
     echo "Running auto invoice generation...\n";
-
-    // Only run on the 1st of the month
-    if (date('j') != '1') {
-        echo "  Skipping - not the 1st of the month\n";
-        return;
-    }
 
     $currentMonth = date('Y-m');
     $generatedCount = 0;
