@@ -43,6 +43,11 @@ foreach ($invoices as $inv) {
 // App Settings
 $appName = APP_NAME;
 $appUrl = APP_URL;
+$qrUrl = rtrim((string) $appUrl, '/') . '/sales/print_invoice.php?ids=' . rawurlencode(implode(',', $invoiceIds));
+$managerName = trim((string) getSetting('invoice_manager_name', ''));
+$isThermal = isset($_GET['thermal']) && (string) $_GET['thermal'] === '1';
+$basePrintUrl = 'print_invoice.php?ids=' . rawurlencode(implode(',', $invoiceIds));
+$thermalUrl = $basePrintUrl . '&thermal=1';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -52,14 +57,14 @@ $appUrl = APP_URL;
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
+            font-size: <?php echo $isThermal ? '12px' : '14px'; ?>;
             margin: 0;
             padding: 20px;
             background: #fff;
             color: #000;
         }
         .invoice-box {
-            max-width: 800px;
+            max-width: <?php echo $isThermal ? '58mm' : '800px'; ?>;
             margin: auto;
             border: 1px solid #eee;
             padding: 20px;
@@ -97,16 +102,78 @@ $appUrl = APP_URL;
             margin-top: 30px;
             font-size: 12px;
         }
+        .signatures {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        .sign-box {
+            width: 220px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .sign-space {
+            height: 12px;
+        }
+        .sign-qr img {
+            width: 90px;
+            height: 90px;
+            border: 1px solid #eee;
+            padding: 4px;
+            display: inline-block;
+        }
+        .qr-wrap {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 10px;
+        }
+        .qr-box {
+            text-align: center;
+            min-width: 140px;
+        }
+        .qr-box img {
+            width: 140px;
+            height: 140px;
+            border: 1px solid #eee;
+            padding: 6px;
+        }
+        .qr-caption {
+            font-size: 11px;
+            margin-top: 6px;
+        }
         @media print {
             .no-print { display: none; }
             body { padding: 0; }
             .invoice-box { border: none; }
         }
+        <?php if ($isThermal): ?>
+        @page { size: 58mm auto; margin: 6mm; }
+        body { padding: 0; }
+        .invoice-box { padding: 10px; }
+        .qr-wrap { flex-direction: column; gap: 10px; }
+        .qr-box { min-width: 0; text-align: left; }
+        .qr-box img { width: 120px; height: 120px; }
+        .details table { width: 100%; }
+        .table, .table thead { display: none; }
+        .thermal-lines { display: block; }
+        .line { display: flex; justify-content: space-between; gap: 10px; margin: 4px 0; }
+        .line strong { font-weight: 700; }
+        .muted { color: #444; }
+        .divider { border-top: 1px dashed #000; margin: 10px 0; }
+        .signatures { justify-content: center; }
+        .sign-box { width: 100%; }
+        <?php else: ?>
+        .thermal-lines { display: none; }
+        <?php endif; ?>
     </style>
 </head>
 <body>
     <div class="no-print" style="text-align: center; margin-bottom: 20px;">
         <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Cetak Invoice</button>
+        <a href="<?php echo htmlspecialchars($basePrintUrl); ?>" style="display: inline-block; padding: 10px 20px; cursor: pointer; text-decoration: none; color: #000; border: 1px solid #ccc; background: #f3f3f3;">Mode Normal</a>
+        <a href="<?php echo htmlspecialchars($thermalUrl); ?>" style="display: inline-block; padding: 10px 20px; cursor: pointer; text-decoration: none; color: #000; border: 1px solid #ccc; background: #f3f3f3;">Mode Thermal 58mm</a>
         <button onclick="window.history.back()" style="padding: 10px 20px; cursor: pointer;">Kembali</button>
     </div>
 
@@ -116,7 +183,8 @@ $appUrl = APP_URL;
             <p>Bukti Pembayaran Tagihan Internet</p>
         </div>
 
-        <div class="details">
+        <div class="qr-wrap">
+            <div class="details" style="flex: 1;">
             <table>
                 <tr>
                     <td width="100">Nama</td>
@@ -140,6 +208,11 @@ $appUrl = APP_URL;
                 </tr>
             </table>
         </div>
+            <div class="qr-box">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?php echo rawurlencode($qrUrl); ?>" alt="QR Invoice">
+                <div class="qr-caption">Scan untuk cek/print cepat</div>
+            </div>
+        </div>
 
         <table class="table">
             <thead>
@@ -162,9 +235,34 @@ $appUrl = APP_URL;
             </tbody>
         </table>
 
+        <div class="thermal-lines">
+            <div class="divider"></div>
+            <?php foreach ($invoices as $inv): ?>
+                <div class="line"><span class="muted">Invoice</span><strong><?php echo htmlspecialchars($inv['invoice_number']); ?></strong></div>
+                <div class="line"><span class="muted">Paket</span><span><?php echo htmlspecialchars($inv['package_name']); ?></span></div>
+                <div class="line"><span class="muted">Periode</span><span><?php echo htmlspecialchars(formatDate($inv['due_date'], 'M Y')); ?></span></div>
+                <div class="line"><span class="muted">Jumlah</span><strong><?php echo htmlspecialchars(formatCurrency($inv['amount'])); ?></strong></div>
+                <div class="divider"></div>
+            <?php endforeach; ?>
+        </div>
+
         <div class="total">
             Total Bayar: <?php echo formatCurrency($totalAmount); ?>
         </div>
+
+        <?php if ($managerName !== ''): ?>
+        <div class="signatures">
+            <div class="sign-box">
+                <div>Mengetahui,</div>
+                <div class="sign-space"></div>
+                <div class="sign-qr">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=<?php echo rawurlencode('Manager: ' . $managerName); ?>" alt="QR Manager">
+                </div>
+                <div><strong><?php echo htmlspecialchars($managerName); ?></strong></div>
+                <div>Manager</div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="footer">
             <p>Terima kasih atas pembayaran Anda.</p>
