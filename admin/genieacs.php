@@ -316,6 +316,28 @@ ob_start();
             </div>
         </div>
 
+        <div id="wifi5gWrap" style="display: none;">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">SSID 5G</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="editSsid5g" class="form-control" placeholder="Otomatis: SSID + 5G">
+                    <button class="btn btn-primary" onclick="saveSsid5g()" title="Simpan SSID 5G">
+                        <i class="fas fa-save"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Password 5G</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="password" id="editPassword5g" class="form-control" style="flex: 1;">
+                    <button class="btn btn-primary" onclick="savePassword5g()" title="Simpan Password 5G">
+                        <i class="fas fa-save"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div style="text-align: right; margin-top: 15px;">
             <button class="btn btn-secondary" onclick="closeWifiModal()">Tutup</button>
         </div>
@@ -530,6 +552,23 @@ function openWifiEdit(serial, ssid, password) {
     document.getElementById('editSerial').value = serial;
     document.getElementById('editSsid').value = ssid;
     document.getElementById('editPassword').value = password;
+    const wrap5g = document.getElementById('wifi5gWrap');
+    if (wrap5g) wrap5g.style.display = 'none';
+    fetch('<?php echo APP_URL; ?>/api/onu_wifi.php?serial=' + encodeURIComponent(serial))
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !data.success || !data.data) return;
+            const has5g = !!data.data.has_5g;
+            if (!has5g) return;
+            const ssid5g = data.data.ssid_5g || '';
+            const pass5g = data.data.wifi_password_5g || '';
+            const inSsid5g = document.getElementById('editSsid5g');
+            const inPass5g = document.getElementById('editPassword5g');
+            if (inSsid5g) inSsid5g.value = ssid5g;
+            if (inPass5g) inPass5g.value = pass5g;
+            if (wrap5g) wrap5g.style.display = '';
+        })
+        .catch(() => {});
     document.getElementById('wifiModal').style.display = 'flex';
 }
 
@@ -600,6 +639,58 @@ function savePassword() {
             location.reload();
         } else {
             alert('Gagal update Password: ' + data.message);
+        }
+    })
+    .catch(error => alert('Error: ' + error));
+}
+
+function saveSsid5g() {
+    const serial = document.getElementById('editSerial').value;
+    const ssid = document.getElementById('editSsid5g').value;
+    const fallback = document.getElementById('editSsid').value || '';
+    const value = (ssid && ssid.length >= 3) ? ssid : fallback;
+    if (value.length < 3) {
+        alert('SSID 5G minimal 3 karakter');
+        return;
+    }
+    if (!confirm('Simpan perubahan SSID 5G?')) return;
+    fetch('<?php echo APP_URL; ?>/api/onu_wifi.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serial: serial, ssid_5g: value })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('SSID 5G berhasil diperbarui');
+            location.reload();
+        } else {
+            alert('Gagal update SSID 5G: ' + data.message);
+        }
+    })
+    .catch(error => alert('Error: ' + error));
+}
+
+function savePassword5g() {
+    const serial = document.getElementById('editSerial').value;
+    const password = document.getElementById('editPassword5g').value;
+    if (password.length < 8) {
+        alert('Password 5G minimal 8 karakter');
+        return;
+    }
+    if (!confirm('Simpan perubahan Password 5G?')) return;
+    fetch('<?php echo APP_URL; ?>/api/onu_wifi.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serial: serial, password_5g: password })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Password 5G berhasil diperbarui');
+            location.reload();
+        } else {
+            alert('Gagal update Password 5G: ' + data.message);
         }
     })
     .catch(error => alert('Error: ' + error));
