@@ -451,6 +451,19 @@ function mikrotikSetProfile($username, $profile, $routerId = null)
         }
     }
 
+    foreach ($allWords as $word) {
+        if (strpos($word, '!trap') === 0) {
+            $trap = mikrotikTrapMessageFromResponse($allWords);
+            if ($trap !== '') {
+                logError('MikroTik set profile failed: ' . $trap);
+            } else {
+                logError('MikroTik set profile failed.');
+            }
+            return false;
+        }
+    }
+
+    mikrotikRemoveActiveSessionByName($username, $routerId);
     return true;
 }
 
@@ -2193,8 +2206,8 @@ function mikrotikPing($target, $count = 4) {
 }
 
 // Remove Active Session by Name
-function mikrotikRemoveActiveSessionByName($username) {
-    $socket = getMikrotikConnection();
+function mikrotikRemoveActiveSessionByName($username, $routerId = null) {
+    $socket = getMikrotikConnection($routerId);
     if (!$socket) {
         return false;
     }
@@ -2219,30 +2232,28 @@ function mikrotikRemoveActiveSessionByName($username) {
         }
     }
     
-    $sessionId = null;
-    foreach ($allWords as $word) {
-        if (strpos($word, '=.id=') === 0) {
-            $sessionId = substr($word, 5);
-            break;
+    $sessions = mikrotikParseUsers($allWords);
+    if (empty($sessions)) {
+        return true;
+    }
+
+    foreach ($sessions as $session) {
+        $sessionId = $session['.id'] ?? null;
+        if (!$sessionId) {
+            continue;
+        }
+        mikrotikWrite($socket, '/ppp/active/remove');
+        mikrotikWrite($socket, '=.id=' . $sessionId);
+        mikrotikWrite($socket, '');
+
+        $response = mikrotikReadSentence($socket);
+        foreach ($response as $word) {
+            if (strpos($word, '!trap') === 0) {
+                return false;
+            }
         }
     }
-    
-    if (!$sessionId) {
-        return false;
-    }
-    
-    mikrotikWrite($socket, '/ppp/active/remove');
-    mikrotikWrite($socket, '=.id=' . $sessionId);
-    mikrotikWrite($socket, '');
-    
-    $response = mikrotikReadSentence($socket);
-    
-    foreach ($response as $word) {
-        if (strpos($word, '!trap') === 0) {
-            return false;
-        }
-    }
-    
+
     return true;
 }
 

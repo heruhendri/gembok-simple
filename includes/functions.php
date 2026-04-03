@@ -743,10 +743,14 @@ function genieacsGetDeviceInfo($serial)
         'rx_power' => null,
         'tx_power' => null,
         'ssid' => null,
+        'ssid_5g' => null,
         'wifi_password' => null,
+        'wifi_password_5g' => null,
+        'has_5g' => false,
         'ip_address' => null,
         'mac_address' => null,
-        'total_associations' => null
+        'total_associations' => null,
+        'total_associations_5g' => null
     ];
 
     // Determine online status (last inform within 5 minutes)
@@ -794,11 +798,35 @@ function genieacsGetDeviceInfo($serial)
         genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WiFi.Radio.1.SSID') ??
         genieacsGetValue($device, 'Device.WiFi.SSID.1.SSID');
 
+    $ssid5g = null;
+    foreach ([5, 6, 7, 8, 9] as $idx) {
+        $ssid5g = genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.SSID');
+        if ($ssid5g !== null) {
+            break;
+        }
+    }
+    if ($ssid5g === null) {
+        $ssid5g = genieacsGetValue($device, 'Device.WiFi.SSID.2.SSID');
+    }
+    $info['ssid_5g'] = $ssid5g;
+
     // WiFi Password
     $info['wifi_password'] =
         genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase') ??
         genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase') ??
         genieacsGetValue($device, 'Device.WiFi.AccessPoint.1.Security.KeyPassphrase');
+
+    $pass5g = null;
+    foreach ([5, 6, 7, 8, 9] as $idx) {
+        $pass5g = genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.PreSharedKey.1.KeyPassphrase');
+        if ($pass5g !== null) {
+            break;
+        }
+    }
+    if ($pass5g === null) {
+        $pass5g = genieacsGetValue($device, 'Device.WiFi.AccessPoint.2.Security.KeyPassphrase');
+    }
+    $info['wifi_password_5g'] = $pass5g;
 
     // PON Optical Power (for GPON/EPON ONUs)
     $info['rx_power'] =
@@ -813,6 +841,17 @@ function genieacsGetDeviceInfo($serial)
 
     // Connected Devices / Total Associations (SSID 1 Only)
     $info['total_associations'] = genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations');
+
+    $assoc5g = null;
+    foreach ([5, 6, 7, 8, 9] as $idx) {
+        $assoc5g = genieacsGetValue($device, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.TotalAssociations');
+        if ($assoc5g !== null) {
+            break;
+        }
+    }
+    $info['total_associations_5g'] = $assoc5g;
+
+    $info['has_5g'] = $info['ssid_5g'] !== null || $info['wifi_password_5g'] !== null || $info['total_associations_5g'] !== null;
 
     return $info;
 }
