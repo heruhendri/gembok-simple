@@ -17,20 +17,27 @@ if (!isCustomerLoggedIn() && !isAdminLoggedIn() && !isTechnicianLoggedIn()) {
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $pppoeUsername = $_GET['pppoe_username'] ?? '';
+        $serial = $_GET['serial'] ?? '';
         
-        if (empty($pppoeUsername)) {
-            echo json_encode(['success' => false, 'message' => 'PPPoE Username required']);
+        if (empty($pppoeUsername) && empty($serial)) {
+            echo json_encode(['success' => false, 'message' => 'PPPoE Username or serial required']);
             exit;
         }
 
-        // Get device info from GenieACS
-        // First find the device by PPPoE username
+        if (!empty($serial)) {
+            $deviceData = genieacsGetDeviceInfo($serial);
+            if ($deviceData) {
+                echo json_encode(['success' => true, 'data' => $deviceData]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Device not found or offline']);
+            }
+            exit;
+        }
+
         $device = genieacsFindDeviceByPppoe($pppoeUsername);
-        
         if ($device) {
             $deviceId = $device['_id'];
             $deviceData = genieacsGetDeviceInfo($deviceId);
-            
             if ($deviceData) {
                 echo json_encode(['success' => true, 'data' => $deviceData]);
             } else {
@@ -51,6 +58,8 @@ try {
     $serial = $input['serial'] ?? '';  // Keep for backward compatibility
     $ssid = $input['ssid'] ?? '';
     $password = $input['password'] ?? '';
+    $ssid5g = $input['ssid_5g'] ?? '';
+    $password5g = $input['password_5g'] ?? '';
 
     // If customer is logged in, enforce ownership
     if (isCustomerLoggedIn()) {
@@ -88,33 +97,98 @@ try {
         echo json_encode(['success' => false, 'message' => 'SSID minimal 3 karakter']);
         exit;
     }
+    if (!empty($ssid5g) && strlen($ssid5g) < 3) {
+        echo json_encode(['success' => false, 'message' => 'SSID 5G minimal 3 karakter']);
+        exit;
+    }
 
     // Validate password
     if (!empty($password) && strlen($password) < 8) {
         echo json_encode(['success' => false, 'message' => 'Password minimal 8 karakter']);
         exit;
     }
+    if (!empty($password5g) && strlen($password5g) < 8) {
+        echo json_encode(['success' => false, 'message' => 'Password 5G minimal 8 karakter']);
+        exit;
+    }
 
-    // Update WiFi settings via GenieACS
+    $targetDevice = genieacsGetDevice($serial);
+    if (!$targetDevice) {
+        echo json_encode(['success' => false, 'message' => 'Device not found or offline']);
+        exit;
+    }
+
+    $wifi5gSsidPath = null;
+    $wifi5gPassPath = null;
+    foreach ([5, 6, 7, 8, 9] as $idx) {
+        $v = genieacsGetValue($targetDevice, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.SSID');
+        if ($v !== null) {
+            $wifi5gSsidPath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.SSID';
+            $wifi5gPassPath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' . $idx . '.PreSharedKey.1.KeyPassphrase';
+            break;
+        }
+    }
+    if ($wifi5gSsidPath === null) {
+        $v = genieacsGetValue($targetDevice, 'Device.WiFi.SSID.2.SSID');
+        if ($v !== null) {
+            $wifi5gSsidPath = 'Device.WiFi.SSID.2.SSID';
+            $wifi5gPassPath = 'Device.WiFi.AccessPoint.2.Security.KeyPassphrase';
+        }
+    }
+
+    $updatedFields = [];
+
     if (!empty($ssid)) {
         $result = genieacsSetParameter($serial, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid);
-
         if (!$result['success']) {
             echo json_encode(['success' => false, 'message' => 'Failed to update SSID: ' . ($result['message'] ?? 'Unknown error')]);
             exit;
         }
+        $updatedFields[] = 'ssid';
     }
 
     if (!empty($password)) {
         $result = genieacsSetParameter($serial, 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $password);
-
         if (!$result['success']) {
             echo json_encode(['success' => false, 'message' => 'Failed to update password: ' . ($result['message'] ?? 'Unknown error')]);
             exit;
         }
+        $updatedFields[] = 'password';
     }
 
-    if (!isCustomerLoggedIn() && (isAdminLoggedIn() || isTechnicianLoggedIn()) && (!empty($ssid) || !empty($password))) {
+    if (!empty($ssid5g)) {
+        $ssid5g = trim((string) $ssid5g);
+        if (!preg_match('/-5g$/i', $ssid5g)) {
+            $ssid5g = rtrim($ssid5g);
+            $ssid5g = preg_replace('/\\s*5g$/i', '', $ssid5g);
+            $ssid5g = $ssid5g . '-5G';
+        }
+        if ($wifi5gSsidPath === null) {
+            echo json_encode(['success' => false, 'message' => 'ONU tidak mendukung WiFi 5G']);
+            exit;
+        }
+        $result = genieacsSetParameter($serial, $wifi5gSsidPath, $ssid5g);
+        if (!$result['success']) {
+            echo json_encode(['success' => false, 'message' => 'Failed to update SSID 5G: ' . ($result['message'] ?? 'Unknown error')]);
+            exit;
+        }
+        $updatedFields[] = 'ssid_5g';
+    }
+
+    if (!empty($password5g)) {
+        if ($wifi5gPassPath === null) {
+            echo json_encode(['success' => false, 'message' => 'ONU tidak mendukung WiFi 5G']);
+            exit;
+        }
+        $result = genieacsSetParameter($serial, $wifi5gPassPath, $password5g);
+        if (!$result['success']) {
+            echo json_encode(['success' => false, 'message' => 'Failed to update password 5G: ' . ($result['message'] ?? 'Unknown error')]);
+            exit;
+        }
+        $updatedFields[] = 'password_5g';
+    }
+
+    if (!isCustomerLoggedIn() && (isAdminLoggedIn() || isTechnicianLoggedIn()) && (!empty($updatedFields))) {
         $customer = null;
         if (!empty($pppoeUsername)) {
             $customer = fetchOne("SELECT * FROM customers WHERE pppoe_username = ? LIMIT 1", [$pppoeUsername]);
@@ -135,16 +209,19 @@ try {
             if (!empty($password)) {
                 $lines[] = "Password: {$password}";
             }
+            if (!empty($ssid5g)) {
+                $lines[] = "SSID 5G: {$ssid5g}";
+            }
+            if (!empty($password5g)) {
+                $lines[] = "Password 5G: {$password5g}";
+            }
             $lines[] = "";
             $lines[] = "Jika ada kendala koneksi setelah perubahan ini, silakan restart modem/ONT Anda.";
 
             sendWhatsApp($customer['phone'], implode("\n", $lines));
         }
 
-        $logParts = [];
-        if (!empty($ssid)) $logParts[] = 'ssid';
-        if (!empty($password)) $logParts[] = 'password';
-        $logFields = !empty($logParts) ? implode(',', $logParts) : '-';
+        $logFields = implode(',', $updatedFields);
         logActivity('WIFI_UPDATE', "Serial: {$serial}, PPPoE: {$pppoeUsername}, Fields: {$logFields}, Actor: " . (isAdminLoggedIn() ? 'admin' : 'technician'));
     }
 
