@@ -229,6 +229,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 redirect('customers.php');
                 break;
+
+            case 'spread_isolation_dates':
+                $groupSize = (int) ($_POST['group_size'] ?? 10);
+                if ($groupSize < 1) {
+                    $groupSize = 1;
+                }
+                if ($groupSize > 200) {
+                    $groupSize = 200;
+                }
+                $startDay = (int) ($_POST['start_day'] ?? 1);
+                if ($startDay < 1) {
+                    $startDay = 1;
+                }
+                if ($startDay > 28) {
+                    $startDay = 28;
+                }
+                $daysCsv = trim((string) ($_POST['days_csv'] ?? ''));
+                $days = [];
+                if ($daysCsv !== '') {
+                    foreach (preg_split('/[,\s]+/', $daysCsv) as $part) {
+                        $part = trim((string) $part);
+                        if ($part === '') {
+                            continue;
+                        }
+                        $val = (int) $part;
+                        if ($val < 1 || $val > 28) {
+                            continue;
+                        }
+                        $days[$val] = $val;
+                    }
+                    $days = array_values($days);
+                    sort($days);
+                }
+
+                $where = "status = 'active'";
+                if ($hasAutoIsolate && isset($_POST['only_auto_isolate'])) {
+                    $where .= " AND auto_isolate = 1";
+                }
+                $targets = fetchAll("SELECT id FROM customers WHERE {$where} ORDER BY id ASC");
+                if (empty($targets)) {
+                    setFlash('warning', 'Tidak ada pelanggan aktif untuk diubah');
+                    redirect('customers.php');
+                }
+
+                $updated = 0;
+                foreach ($targets as $i => $row) {
+                    if (!empty($days)) {
+                        $dayIndex = intdiv((int) $i, $groupSize) % count($days);
+                        $day = (int) $days[$dayIndex];
+                    } else {
+                        $day = $startDay + intdiv((int) $i, $groupSize);
+                        $day = (($day - 1) % 28) + 1;
+                    }
+                    if (update('customers', ['isolation_date' => $day], 'id = ?', [(int) $row['id']])) {
+                        $updated++;
+                    }
+                }
+
+                setFlash('success', "Berhasil menyebar tanggal isolir untuk {$updated} pelanggan.");
+                $mode = empty($days) ? "range start_day={$startDay}" : ('days=' . implode('-', $days));
+                logActivity('SPREAD_ISOLATION_DATES', "Updated {$updated} customers, group_size={$groupSize}, {$mode}");
+                redirect('customers.php');
+                break;
         }
     }
 }
@@ -376,6 +439,45 @@ ob_start();
         }
     }
 </style>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-calendar-alt"></i> Sebar Tanggal Jatuh Tempo</h3>
+    </div>
+    <form method="POST" onsubmit="return confirm('Sebar tanggal isolir untuk pelanggan aktif? Ini akan mengubah data existing.');">
+        <input type="hidden" name="action" value="spread_isolation_dates">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+            <div class="form-group">
+                <label class="form-label">Per Grup (Pelanggan)</label>
+                <input type="number" name="group_size" class="form-control" value="10" min="1" max="200">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Mulai Tanggal</label>
+                <input type="number" name="start_day" class="form-control" value="1" min="1" max="28">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label">Gunakan Tanggal (Opsional)</label>
+                <input type="text" name="days_csv" class="form-control" value="20,21,22,23,24,25" placeholder="Contoh: 20,21,22,23,24,25">
+                <small style="color: var(--text-muted);">Jika diisi, sistem hanya akan memakai tanggal ini dan membaginya per grup (mis. 10 pelanggan per tanggal).</small>
+            </div>
+            <?php if ($hasAutoIsolate): ?>
+            <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" name="only_auto_isolate" value="1">
+                    <span>Hanya Isolir Otomatis</span>
+                </label>
+            </div>
+            <?php endif; ?>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-random"></i> Terapkan</button>
+        </div>
+        <div style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
+            Pengingat tagihan dikirim berdasarkan jatuh tempo invoice. Jatuh tempo invoice mengikuti tanggal isolir pelanggan, jadi menyebar tanggal isolir membantu mengurangi WhatsApp terkirim bersamaan.
+        </div>
+    </form>
+</div>
 
 <!-- Add Customer Form -->
 <div class="card">

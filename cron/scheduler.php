@@ -285,13 +285,16 @@ function sendReminders($pdo)
     echo "Sending payment reminders...\n";
 
     // Get customers with unpaid invoices due in 3 days
+    $hasAutoIsolate = ensureCustomersAutoIsolateColumn();
+    $autoIsolateClause = $hasAutoIsolate ? "AND c.auto_isolate = 1" : "";
     $upcomingInvoices = fetchAll("
-        SELECT c.id, c.name, c.phone, c.pppoe_username, i.invoice_number, i.amount, i.due_date
+        SELECT c.id, c.name, c.phone, c.pppoe_username, i.id as invoice_id, i.invoice_number, i.amount, i.due_date
         FROM customers c
         INNER JOIN invoices i ON c.id = i.customer_id
         WHERE i.status = 'unpaid'
         AND i.due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
         AND c.status = 'active'
+        {$autoIsolateClause}
         AND i.due_date = (
             SELECT MIN(i2.due_date)
             FROM invoices i2
@@ -305,12 +308,14 @@ function sendReminders($pdo)
 
     foreach ($upcomingInvoices as $invoice) {
         $daysUntilDue = (strtotime($invoice['due_date']) - time()) / 86400;
+        $payUrl = invoicePayUrl((string) $invoice['invoice_number'], (float) $invoice['amount'], (string) $invoice['due_date']);
 
         $message = "Halo {$invoice['name']},\n\n";
         $message .= "Pengingat: Tagihan internet Anda akan jatuh tempo dalam " . ceil($daysUntilDue) . " hari.\n\n";
         $message .= "Tagihan: " . formatCurrency($invoice['amount']) . "\n";
         $message .= "Invoice: {$invoice['invoice_number']}\n";
         $message .= "Jatuh Tempo: " . formatDate($invoice['due_date']) . "\n\n";
+        $message .= "Bayar online:\n{$payUrl}\n\n";
         $message .= "Mohon lakukan pembayaran sebelum jatuh tempo untuk menghindari isolir.\n\n";
         $message .= "Terima kasih.";
         $message .= getWhatsAppFooter();

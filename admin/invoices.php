@@ -439,7 +439,7 @@ ob_start();
                                 </a>
                                 <span class="badge badge-success" style="align-self: center;">Lunas</span>
                             <?php else: ?>
-                                <button class="btn btn-secondary btn-sm" onclick="sendWhatsApp('<?php echo htmlspecialchars($inv['phone']); ?>', '<?php echo htmlspecialchars($inv['invoice_number']); ?>', '<?php echo htmlspecialchars(formatCurrency($inv['amount'])); ?>')" title="Kirim WA">
+                                <button class="btn btn-secondary btn-sm" onclick="sendWhatsApp('<?php echo htmlspecialchars($inv['phone']); ?>', '<?php echo htmlspecialchars($inv['invoice_number']); ?>', '<?php echo htmlspecialchars(formatCurrency($inv['amount'])); ?>', '<?php echo htmlspecialchars(invoicePayUrl((string) $inv['invoice_number'], (float) $inv['amount'], (string) $inv['due_date'])); ?>')" title="Kirim WA">
                                     <i class="fab fa-whatsapp"></i>
                                 </button>
                             <?php endif; ?>
@@ -588,7 +588,7 @@ function closeManualModal() {
 }
 
 // Send WhatsApp
-function sendWhatsApp(phone, invoiceNumber, amount) {
+function sendWhatsApp(phone, invoiceNumber, amount, payUrl) {
     if (!phone) {
         alert('Nomor HP pelanggan tidak tersedia');
         return;
@@ -600,7 +600,7 @@ function sendWhatsApp(phone, invoiceNumber, amount) {
         phone = '62' + phone.substring(1);
     }
     
-    const message = `Halo,\n\nBerikut adalah informasi tagihan internet Anda:\n\nInvoice: ${invoiceNumber}\nJumlah: ${amount}\n\nMohon lakukan pembayaran sebelum jatuh tempo.\n\nTerima kasih.`;
+    const message = `Halo,\n\nBerikut adalah informasi tagihan internet Anda:\n\nInvoice: ${invoiceNumber}\nJumlah: ${amount}\n\nBayar online:\n${payUrl}\n\nTerima kasih.`;
     
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 }
