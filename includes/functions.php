@@ -1398,6 +1398,69 @@ function ensureCustomersAutoIsolateColumn()
     }
 }
 
+function ensureInvoicesPaymentLinkColumns()
+{
+    static $checked = false;
+    if ($checked) {
+        return true;
+    }
+    if (!tableExists('invoices')) {
+        return false;
+    }
+    try {
+        $pdo = getDB();
+        $cols = [
+            'payment_gateway' => "ALTER TABLE invoices ADD COLUMN payment_gateway VARCHAR(20) NULL AFTER payment_ref",
+            'payment_method' => "ALTER TABLE invoices ADD COLUMN payment_method VARCHAR(100) NULL AFTER payment_gateway",
+            'payment_link' => "ALTER TABLE invoices ADD COLUMN payment_link TEXT NULL AFTER payment_method",
+            'payment_reference' => "ALTER TABLE invoices ADD COLUMN payment_reference VARCHAR(100) NULL AFTER payment_link",
+            'payment_payload' => "ALTER TABLE invoices ADD COLUMN payment_payload TEXT NULL AFTER payment_reference",
+            'payment_link_created_at' => "ALTER TABLE invoices ADD COLUMN payment_link_created_at DATETIME NULL AFTER payment_payload",
+            'payment_link_expires_at' => "ALTER TABLE invoices ADD COLUMN payment_link_expires_at DATETIME NULL AFTER payment_link_created_at"
+        ];
+        foreach ($cols as $name => $ddl) {
+            $stmt = $pdo->query("SHOW COLUMNS FROM invoices LIKE '{$name}'");
+            $exists = $stmt && $stmt->rowCount() > 0;
+            if (!$exists) {
+                $pdo->exec($ddl);
+            }
+        }
+        $checked = true;
+        return true;
+    } catch (Exception $e) {
+        logError('Ensure invoices payment columns failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function getInvoicePayTokenSecret()
+{
+    $row = fetchOne("SELECT setting_value FROM settings WHERE setting_key = 'INVOICE_PAY_TOKEN' LIMIT 1");
+    if ($row && trim((string) ($row['setting_value'] ?? '')) !== '') {
+        return (string) $row['setting_value'];
+    }
+    $token = bin2hex(random_bytes(16));
+    if ($row) {
+        update('settings', ['setting_value' => $token], "setting_key = 'INVOICE_PAY_TOKEN'");
+    } else {
+        insert('settings', ['setting_key' => 'INVOICE_PAY_TOKEN', 'setting_value' => $token]);
+    }
+    return $token;
+}
+
+function invoicePayToken($invoiceNumber, $amount, $dueDate)
+{
+    $secret = getInvoicePayTokenSecret();
+    $payload = (string) $invoiceNumber . '|' . (string) (int) $amount . '|' . (string) $dueDate;
+    return hash_hmac('sha256', $payload, $secret);
+}
+
+function invoicePayUrl($invoiceNumber, $amount, $dueDate)
+{
+    $token = invoicePayToken($invoiceNumber, $amount, $dueDate);
+    return rtrim((string) APP_URL, '/') . '/pay_invoice.php?inv=' . rawurlencode((string) $invoiceNumber) . '&token=' . rawurlencode($token);
+}
+
 function sanitizeBackupFilename($filename)
 {
     $name = basename((string) $filename);
