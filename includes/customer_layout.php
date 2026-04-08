@@ -84,6 +84,29 @@ ob_start();
             --sidebar-collapsed: 70px;
         }
 
+        body.light-theme {
+            --bg-primary: #f6f7fb;
+            --bg-secondary: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.9);
+            --bg-sidebar: #ffffff;
+            --neon-cyan: #0b5fff;
+            --neon-purple: #6d28d9;
+            --neon-pink: #db2777;
+            --neon-green: #16a34a;
+            --neon-orange: #ea580c;
+            --neon-red: #dc2626;
+            --gradient-primary: linear-gradient(135deg, #0b5fff 0%, #6d28d9 100%);
+            --gradient-success: linear-gradient(135deg, #16a34a 0%, #059669 100%);
+            --gradient-warning: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+            --text-primary: #0b1220;
+            --text-secondary: rgba(11, 18, 32, 0.7);
+            --text-muted: rgba(11, 18, 32, 0.5);
+            --border-color: rgba(11, 18, 32, 0.12);
+            --border-glow: rgba(11, 95, 255, 0.22);
+            --shadow-neon: 0 0 18px rgba(11, 95, 255, 0.18);
+            --shadow-card: 0 8px 28px rgba(17, 24, 39, 0.08);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -96,6 +119,7 @@ ob_start();
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
         a {
@@ -198,6 +222,26 @@ ob_start();
             gap: 10px;
             align-items: center;
         }
+
+        .theme-toggle-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 8px 10px;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+
+        body.light-theme .theme-toggle-btn {
+            background: rgba(11, 18, 32, 0.04);
+        }
+
+        .theme-toggle-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-glow);
+        }
         
         .menu-toggle {
             display: none;
@@ -216,6 +260,11 @@ ob_start();
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: var(--shadow-card);
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
         }
 
         .card-header {
@@ -735,6 +784,9 @@ ob_start();
                 <button class="menu-toggle" onclick="toggleSidebar()" style="display: none; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.5rem;">
                     <i class="fas fa-bars"></i>
                 </button>
+                <button type="button" class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Mode Siang/Malam">
+                    <i class="fas fa-moon" id="themeToggleIcon"></i>
+                </button>
                 <span style="color: var(--text-secondary);">
                     <i class="fas fa-user"></i>
                     <?php echo htmlspecialchars($customer['name']); ?>
@@ -770,6 +822,32 @@ ob_start();
     
     <!-- Scripts -->
     <script>
+        function applyTheme(theme) {
+            const body = document.body;
+            const icon = document.getElementById('themeToggleIcon');
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                if (icon) icon.className = 'fas fa-sun';
+            } else {
+                body.classList.remove('light-theme');
+                if (icon) icon.className = 'fas fa-moon';
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.contains('light-theme');
+            const next = isLight ? 'dark' : 'light';
+            localStorage.setItem('theme', next);
+            applyTheme(next);
+        }
+
+        (function initTheme() {
+            const saved = localStorage.getItem('theme');
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            const theme = saved ? saved : (prefersLight ? 'light' : 'dark');
+            applyTheme(theme);
+        })();
+
         function toggleSidebar() {
             document.querySelector('.sidebar').classList.toggle('active');
         }
