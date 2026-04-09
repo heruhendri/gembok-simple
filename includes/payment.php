@@ -172,6 +172,24 @@ function paymentMidtransSnapBaseUrl()
     return $isSandbox ? 'https://app.sandbox.midtrans.com' : 'https://app.midtrans.com';
 }
 
+function paymentGetDuitkuCreateInvoiceUrl()
+{
+    $mode = strtolower(trim((string) paymentGetConfig('DUITKU_MODE', 'production')));
+    $isSandbox = strpos($mode, 'sandbox') !== false;
+    return $isSandbox
+        ? 'https://api-sandbox.duitku.com/api/merchant/createInvoice'
+        : 'https://api-prod.duitku.com/api/merchant/createInvoice';
+}
+
+function paymentGetXenditApiBaseUrl()
+{
+    $base = trim((string) paymentGetConfig('XENDIT_BASE_URL', 'https://api.xendit.co'));
+    if ($base === '') {
+        $base = 'https://api.xendit.co';
+    }
+    return rtrim($base, '/');
+}
+
 // Generate payment link based on gateway
 function generatePaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $gateway = 'tripay', $paymentMethod = '', $orderIdOverride = '') {
     switch ($gateway) {
@@ -180,6 +198,12 @@ function generatePaymentLink($invoiceNumber, $amount, $customerName, $customerPh
             
         case 'midtrans':
             return generateMidtransPaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $paymentMethod, $orderIdOverride);
+
+        case 'duitku':
+            return generateDuitkuPaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $paymentMethod, $orderIdOverride);
+
+        case 'xendit':
+            return generateXenditPaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $paymentMethod, $orderIdOverride);
             
         default:
             return [
@@ -188,6 +212,180 @@ function generatePaymentLink($invoiceNumber, $amount, $customerName, $customerPh
                 'link' => null
             ];
     }
+}
+
+function paymentCurlJson($url, $method, $headers, $payload = null, $timeout = 20)
+{
+    $ch = curl_init((string) $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, (int) $timeout);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper((string) $method));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, (array) $headers);
+    if ($payload !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($payload) ? $payload : json_encode($payload));
+    }
+    $raw = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    unset($ch);
+    return [
+        'http_code' => (int) $httpCode,
+        'error' => (string) $error,
+        'raw' => $raw,
+        'json' => json_decode((string) $raw, true)
+    ];
+}
+
+function generateDuitkuPaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $paymentMethod = '', $orderIdOverride = '')
+{
+    $merchantCode = trim((string) paymentGetConfig('DUITKU_MERCHANT_CODE', ''));
+    $apiKey = trim((string) paymentGetConfig('DUITKU_API_KEY', ''));
+    if ($merchantCode === '' || $apiKey === '') {
+        return ['success' => false, 'message' => 'Payment gateway not configured', 'link' => null];
+    }
+    if (!function_exists('curl_init')) {
+        return ['success' => false, 'message' => 'cURL tidak tersedia di server ini', 'link' => null];
+    }
+
+    $merchantOrderId = $orderIdOverride !== '' ? (string) $orderIdOverride : (string) $invoiceNumber;
+    $amountInt = (int) $amount;
+    $timestamp = (int) round(microtime(true) * 1000);
+    $signature = hash('sha256', $merchantCode . $timestamp . $apiKey);
+
+    $expiryMinutes = (int) paymentGetConfig('DUITKU_EXPIRY_MINUTES', '60');
+    if ($expiryMinutes < 5) {
+        $expiryMinutes = 5;
+    }
+    $dueTs = strtotime((string) $dueDate);
+    if ($dueTs !== false) {
+        $minsToDue = (int) floor(($dueTs - time()) / 60);
+        if ($minsToDue > 0) {
+            $expiryMinutes = min($expiryMinutes, $minsToDue);
+        }
+    }
+
+    $usePretty = (string) paymentGetConfig('USE_PRETTY_URLS', '1') === '1';
+    $isVoucher = preg_match('/^VCR/i', (string) $merchantOrderId) === 1;
+    $returnUrl = $isVoucher
+        ? rtrim(APP_URL, '/') . ($usePretty ? ('/voucher/status/' . rawurlencode($merchantOrderId)) : ('/voucher-status.php?order=' . rawurlencode($merchantOrderId)))
+        : rtrim(APP_URL, '/') . '/portal/dashboard.php';
+
+    $payload = [
+        'paymentAmount' => $amountInt,
+        'merchantOrderId' => $merchantOrderId,
+        'productDetails' => 'Pembayaran ' . $merchantOrderId,
+        'email' => paymentFallbackEmailFromPhone($customerPhone),
+        'phoneNumber' => (string) $customerPhone,
+        'customerVaName' => (string) $customerName,
+        'callbackUrl' => rtrim(APP_URL, '/') . '/webhooks/duitku.php',
+        'returnUrl' => $returnUrl,
+        'expiryPeriod' => $expiryMinutes
+    ];
+    $methodCode = strtoupper(trim((string) $paymentMethod));
+    if ($methodCode !== '' && $methodCode !== 'AUTO') {
+        $payload['paymentMethod'] = $methodCode;
+    }
+
+    $url = paymentGetDuitkuCreateInvoiceUrl();
+    $res = paymentCurlJson($url, 'POST', [
+        'Content-Type: application/json',
+        'x-duitku-signature: ' . $signature,
+        'x-duitku-timestamp: ' . $timestamp,
+        'x-duitku-merchantcode: ' . $merchantCode
+    ], $payload, 30);
+
+    $json = $res['json'];
+    if ((int) $res['http_code'] !== 200 || !is_array($json)) {
+        paymentLog('DUITKU_CREATE_INVOICE_FAILED', ['http' => $res['http_code'], 'error' => $res['error'], 'raw' => $res['raw']]);
+        return ['success' => false, 'message' => 'Gagal membuat pembayaran Duitku', 'link' => null];
+    }
+
+    $statusCode = (string) ($json['statusCode'] ?? '');
+    if ($statusCode !== '' && $statusCode !== '00') {
+        $msg = (string) ($json['statusMessage'] ?? 'Duitku error');
+        paymentLog('DUITKU_CREATE_INVOICE_ERROR', $json);
+        return ['success' => false, 'message' => $msg, 'link' => null];
+    }
+
+    $paymentUrl = (string) ($json['paymentUrl'] ?? '');
+    if ($paymentUrl === '') {
+        paymentLog('DUITKU_CREATE_INVOICE_EMPTY_URL', $json);
+        return ['success' => false, 'message' => 'Duitku tidak mengembalikan paymentUrl', 'link' => null];
+    }
+
+    return ['success' => true, 'link' => $paymentUrl, 'data' => $json];
+}
+
+function generateXenditPaymentLink($invoiceNumber, $amount, $customerName, $customerPhone, $dueDate, $paymentMethod = '', $orderIdOverride = '')
+{
+    $secretKey = trim((string) paymentGetConfig('XENDIT_SECRET_KEY', ''));
+    if ($secretKey === '') {
+        return ['success' => false, 'message' => 'Payment gateway not configured', 'link' => null];
+    }
+    if (!function_exists('curl_init')) {
+        return ['success' => false, 'message' => 'cURL tidak tersedia di server ini', 'link' => null];
+    }
+
+    $externalId = $orderIdOverride !== '' ? (string) $orderIdOverride : (string) $invoiceNumber;
+    $amountFloat = (float) $amount;
+
+    $usePretty = (string) paymentGetConfig('USE_PRETTY_URLS', '1') === '1';
+    $isVoucher = preg_match('/^VCR/i', (string) $externalId) === 1;
+    $returnUrl = $isVoucher
+        ? rtrim(APP_URL, '/') . ($usePretty ? ('/voucher/status/' . rawurlencode($externalId)) : ('/voucher-status.php?order=' . rawurlencode($externalId)))
+        : rtrim(APP_URL, '/') . '/portal/dashboard.php';
+
+    $payload = [
+        'external_id' => $externalId,
+        'amount' => $amountFloat,
+        'payer_email' => paymentFallbackEmailFromPhone($customerPhone),
+        'description' => 'Pembayaran ' . $externalId,
+        'success_redirect_url' => $returnUrl,
+        'failure_redirect_url' => $returnUrl
+    ];
+
+    $pm = trim((string) $paymentMethod);
+    if ($pm !== '' && strtoupper($pm) !== 'AUTO') {
+        $payload['payment_methods'] = array_values(array_filter(array_map('trim', explode(',', $pm))));
+    }
+
+    $invoiceDuration = (int) paymentGetConfig('XENDIT_INVOICE_DURATION', '3600');
+    if ($invoiceDuration > 0) {
+        $dueTs = strtotime((string) $dueDate);
+        if ($dueTs !== false && $dueTs > time()) {
+            $invoiceDuration = min($invoiceDuration, (int) ($dueTs - time()));
+        }
+        $payload['invoice_duration'] = $invoiceDuration;
+    }
+
+    $auth = base64_encode($secretKey . ':');
+    $url = paymentGetXenditApiBaseUrl() . '/v2/invoices';
+    $res = paymentCurlJson($url, 'POST', [
+        'Authorization: Basic ' . $auth,
+        'Content-Type: application/json'
+    ], $payload, 30);
+
+    $json = $res['json'];
+    if ((int) $res['http_code'] < 200 || (int) $res['http_code'] >= 300 || !is_array($json)) {
+        paymentLog('XENDIT_CREATE_INVOICE_FAILED', ['http' => $res['http_code'], 'error' => $res['error'], 'raw' => $res['raw']]);
+        return ['success' => false, 'message' => 'Gagal membuat pembayaran Xendit', 'link' => null];
+    }
+
+    $paymentUrl = (string) ($json['invoice_url'] ?? '');
+    if ($paymentUrl === '') {
+        $paymentUrl = (string) ($json['url'] ?? '');
+    }
+    if ($paymentUrl === '') {
+        paymentLog('XENDIT_CREATE_INVOICE_EMPTY_URL', $json);
+        return ['success' => false, 'message' => 'Xendit tidak mengembalikan invoice_url', 'link' => null];
+    }
+
+    return ['success' => true, 'link' => $paymentUrl, 'data' => $json];
 }
 
 // Tripay Payment Link Generator
@@ -427,6 +625,24 @@ function getPaymentGateways() {
             'description' => 'Payment gateway populer Indonesia',
             'features' => ['QRIS', 'Virtual Account', 'VA', 'Bank Transfer'],
             'supported_channels' => ['QRIS', 'VA', 'Bank Transfer']
+        ],
+        [
+            'id' => 'duitku',
+            'name' => 'Duitku',
+            'icon' => 'fa-credit-card',
+            'color' => '#0ea5e9',
+            'description' => 'Payment gateway Indonesia',
+            'features' => ['QRIS', 'Virtual Account', 'E-Wallet'],
+            'supported_channels' => ['QRIS', 'VA', 'E-Wallet']
+        ],
+        [
+            'id' => 'xendit',
+            'name' => 'Xendit',
+            'icon' => 'fa-credit-card',
+            'color' => '#2563eb',
+            'description' => 'Payment gateway Indonesia',
+            'features' => ['QRIS', 'Virtual Account', 'E-Wallet', 'Retail'],
+            'supported_channels' => ['QRIS', 'VA', 'E-Wallet', 'Retail']
         ]
     ];
 }
