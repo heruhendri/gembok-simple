@@ -17,7 +17,7 @@ ensurePublicVoucherTables();
 
 $appName = getSetting('app_name', 'GEMBOK');
 $defaultGateway = strtolower((string) getSetting('DEFAULT_PAYMENT_GATEWAY', 'tripay'));
-if (!in_array($defaultGateway, ['tripay', 'midtrans'], true)) {
+if (!in_array($defaultGateway, ['tripay', 'midtrans', 'duitku', 'xendit'], true)) {
     $defaultGateway = 'tripay';
 }
 
@@ -36,7 +36,7 @@ if ($defaultGateway === 'tripay') {
         ['code' => 'ALFAMART', 'name' => 'Alfamart'],
         ['code' => 'INDOMARET', 'name' => 'Indomaret']
     ];
-} else {
+} elseif ($defaultGateway === 'midtrans') {
     $paymentMethods = [
         ['code' => 'qris', 'name' => 'QRIS'],
         ['code' => 'gopay', 'name' => 'GoPay'],
@@ -45,6 +45,17 @@ if ($defaultGateway === 'tripay') {
         ['code' => 'mandiri_va', 'name' => 'Mandiri Virtual Account'],
         ['code' => 'bni_va', 'name' => 'BNI Virtual Account'],
         ['code' => 'permata_va', 'name' => 'Permata Virtual Account']
+    ];
+} elseif ($defaultGateway === 'duitku') {
+    $paymentMethods = [
+        ['code' => 'AUTO', 'name' => 'Otomatis'],
+        ['code' => 'QR', 'name' => 'QRIS'],
+        ['code' => 'VC', 'name' => 'Virtual Account'],
+        ['code' => 'DA', 'name' => 'E-Wallet']
+    ];
+} else {
+    $paymentMethods = [
+        ['code' => 'AUTO', 'name' => 'Otomatis']
     ];
 }
 

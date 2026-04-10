@@ -569,6 +569,13 @@ function insertDefaultData() {
         ['invoice_start', '1'],
         ['invoice_manager_name', ''],
         ['INVOICE_PAY_TOKEN', ''],
+        ['DUITKU_MERCHANT_CODE', ''],
+        ['DUITKU_API_KEY', ''],
+        ['DUITKU_MODE', 'production'],
+        ['DUITKU_EXPIRY_MINUTES', '60'],
+        ['XENDIT_SECRET_KEY', ''],
+        ['XENDIT_CALLBACK_TOKEN', ''],
+        ['XENDIT_INVOICE_DURATION', '3600'],
         ['PUBLIC_VOUCHER_PREFIX', 'VCH-'],
         ['PUBLIC_VOUCHER_LENGTH', '6']
     ];

@@ -56,7 +56,7 @@ if (!$invoice) {
     exit;
 }
 
-$expected = invoicePayToken($invoice['invoice_number'], $invoice['amount'], $invoice['due_date']);
+$expected = invoicePayToken($invoice['invoice_number']);
 if (!hash_equals($expected, $token)) {
     header('HTTP/1.1 403 Forbidden');
     payInvoiceRender('Link tidak valid', '<div class="title">Link pembayaran tidak valid</div><div class="muted">Link ini tidak sesuai atau sudah kadaluarsa.</div>');
@@ -98,11 +98,22 @@ if ($existingLink !== '' && $expiresAt !== '') {
 }
 
 $gateway = getSetting('DEFAULT_PAYMENT_GATEWAY', 'tripay');
-if (!in_array($gateway, ['tripay', 'midtrans'], true)) {
+if (!in_array($gateway, ['tripay', 'midtrans', 'duitku', 'xendit'], true)) {
     $gateway = 'tripay';
 }
 
-$defaultMethod = $gateway === 'midtrans' ? 'qris' : 'QRIS';
+$defaultMethod = '';
+if ($gateway === 'tripay') {
+    $defaultMethod = 'QRIS';
+} elseif ($gateway === 'midtrans') {
+    $defaultMethod = 'qris';
+}
+
+$orderId = (string) ($invoice['payment_order_id'] ?? '');
+if ($orderId === '') {
+    $orderId = (string) $invoice['invoice_number'];
+}
+$orderId = $orderId . '-' . date('YmdHis') . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
 
 $result = generatePaymentLink(
     (string) $invoice['invoice_number'],
@@ -111,7 +122,8 @@ $result = generatePaymentLink(
     (string) ($invoice['customer_phone'] ?? ''),
     (string) $invoice['due_date'],
     $gateway,
-    $defaultMethod
+    $defaultMethod,
+    $orderId
 );
 
 if (!($result['success'] ?? false) || trim((string) ($result['link'] ?? '')) === '') {
@@ -134,6 +146,16 @@ if (is_array($data)) {
     if ($gateway === 'midtrans' && isset($data['token'])) {
         $reference = (string) $data['token'];
     }
+    if ($gateway === 'duitku' && isset($data['reference'])) {
+        $reference = (string) $data['reference'];
+    }
+    if ($gateway === 'xendit') {
+        if (isset($data['id'])) {
+            $reference = (string) $data['id'];
+        } elseif (isset($data['invoice_id'])) {
+            $reference = (string) $data['invoice_id'];
+        }
+    }
 }
 
 $expiresTs = $now + (24 * 60 * 60);
@@ -144,7 +166,7 @@ if ($dueTs !== false && $dueTs > $now) {
 
 update('invoices', [
     'payment_gateway' => $gateway,
-    'payment_method' => $defaultMethod,
+    'payment_order_id' => $orderId,
     'payment_link' => $link,
     'payment_reference' => $reference,
     'payment_payload' => is_array($data) ? json_encode($data) : null,
