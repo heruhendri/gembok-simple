@@ -216,34 +216,34 @@ ob_start();
 </div>
 
 <!-- ISP Stats Grid (Mikhmon Style) -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
+<div class="isp-stats-grid">
     <!-- Total Pelanggan -->
-    <div style="background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(0, 136, 204, 0.2)); border: 1px solid var(--neon-cyan); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+    <div class="isp-stat-card" style="background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(0, 136, 204, 0.2)); border: 1px solid var(--neon-cyan);"
          onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 245, 255, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-cyan);"><?php echo $stats['totalCustomers']; ?></div>
-        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-users" style="margin-right: 5px;"></i> Total Pelanggan</div>
+        <div class="isp-stat-value" style="color: var(--neon-cyan);"><?php echo $stats['totalCustomers']; ?></div>
+        <div class="isp-stat-label"><i class="fas fa-users" style="margin-right: 5px;"></i> Total Pelanggan</div>
     </div>
     <!-- PPPoE Active -->
-    <div style="background: linear-gradient(135deg, rgba(191, 0, 255, 0.1), rgba(122, 0, 163, 0.2)); border: 1px solid var(--neon-purple); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+    <div class="isp-stat-card" style="background: linear-gradient(135deg, rgba(191, 0, 255, 0.1), rgba(122, 0, 163, 0.2)); border: 1px solid var(--neon-purple);"
          onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(191, 0, 255, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-purple);"><?php echo $pppoeActiveCount; ?></div>
-        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-network-wired" style="margin-right: 5px;"></i> PPPoE Active</div>
+        <div class="isp-stat-value" style="color: var(--neon-purple);"><?php echo $pppoeActiveCount; ?></div>
+        <div class="isp-stat-label"><i class="fas fa-network-wired" style="margin-right: 5px;"></i> PPPoE Active</div>
     </div>
     <!-- Pelanggan Isolir -->
-    <div style="background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(204, 85, 42, 0.2)); border: 1px solid var(--neon-orange); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+    <div class="isp-stat-card" style="background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(204, 85, 42, 0.2)); border: 1px solid var(--neon-orange);"
          onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(255, 107, 53, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 2.8rem; font-weight: 800; color: var(--neon-orange);"><?php echo $stats['isolatedCustomers']; ?></div>
-        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-user-lock" style="margin-right: 5px;"></i> Pelanggan Isolir</div>
+        <div class="isp-stat-value" style="color: var(--neon-orange);"><?php echo $stats['isolatedCustomers']; ?></div>
+        <div class="isp-stat-label"><i class="fas fa-user-lock" style="margin-right: 5px;"></i> Pelanggan Isolir</div>
     </div>
     <!-- Total Pendapatan Bulan Ini -->
-    <div style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 168, 89, 0.2)); border: 1px solid var(--neon-green); border-radius: 16px; padding: 24px; text-align: center; color: white; transition: transform 0.3s, box-shadow 0.3s;"
+    <div class="isp-stat-card" style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 168, 89, 0.2)); border: 1px solid var(--neon-green);"
          onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 12px 30px rgba(0, 255, 136, 0.15)';"
          onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 1.8rem; font-weight: 800; margin-bottom: 5px; color: var(--neon-green);"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
-        <div style="font-size: 0.95rem; margin-top: 10px; font-weight: 500;"><i class="fas fa-wallet" style="margin-right: 5px;"></i> Total Pendapatan Bulan Ini</div>
+        <div class="isp-stat-value isp-stat-value-currency" style="color: var(--neon-green);"><?php echo formatCurrency($stats['totalRevenue']); ?></div>
+        <div class="isp-stat-label"><i class="fas fa-wallet" style="margin-right: 5px;"></i> Total Pendapatan Bulan Ini</div>
     </div>
 </div>
 
@@ -740,6 +740,38 @@ ob_start();
         background: rgba(255, 193, 7, 0.1);
         border: 1px solid var(--neon-orange);
         color: var(--neon-orange);
+    }
+
+    .isp-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .isp-stat-card {
+        border-radius: 14px;
+        padding: 16px 14px;
+        text-align: center;
+        color: white;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .isp-stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        word-break: break-word;
+    }
+
+    .isp-stat-value-currency {
+        font-size: 1.35rem;
+    }
+
+    .isp-stat-label {
+        font-size: 0.9rem;
+        margin-top: 8px;
+        font-weight: 600;
     }
 
     /* Responsive: stack 2-column grid on mobile */
