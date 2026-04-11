@@ -1,5 +1,5 @@
 <?php
-// Step 6: Finish Installation
+// Step 4: Finish Installation
 ?>
 
 <h2>🎉 Ready to Install!</h2>
@@ -10,8 +10,6 @@
     <ul style="margin: 10px 0 0 20px; color: #666;">
         <li>Database: <?php echo htmlspecialchars($_SESSION['db_config']['name'] ?? 'Not configured'); ?></li>
         <li>Admin Username: <?php echo htmlspecialchars($_SESSION['admin_config']['username'] ?? 'Not configured'); ?></li>
-        <li>MikroTik: <?php echo !empty($_SESSION['mikrotik_config']['host']) ? 'Configured' : 'Not configured (optional)'; ?></li>
-        <li>Integrations: <?php echo !empty($_SESSION['integrations_config']['whatsapp_url']) ? 'Configured' : 'Not configured (optional)'; ?></li>
     </ul>
 </div>
 
@@ -31,14 +29,14 @@
         <li>Pastikan database sudah dibuat di cPanel/phpMyAdmin</li>
         <li>Installer akan menghapus semua data di database yang sama</li>
         <li>Backup data penting sebelum melanjutkan</li>
-        <li>Installer akan mengirim domain & waktu instalasi untuk statistik pemakaian</li>
+        <li>Installer akan mengirim domain & waktu instalasi ke server relay (jika Anda menyetujuinya pada langkah awal)</li>
         <li>Setelah instalasi berhasil, hapus file install.sh dari server jika digunakan untuk instalasi agar tidak dijalankan ulang dan menghapus data yang sudah ada</li>
     </ul>
 </div>
 
-<form method="POST" action="install.php?step=6">
+<form method="POST" action="install.php?step=4">
     <div style="display: flex; gap: 10px; margin-top: 20px;">
-        <a href="install.php?step=5" class="btn btn-secondary">← Kembali</a>
+        <a href="install.php?step=3" class="btn btn-secondary">← Kembali</a>
         <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
             🚀 Install Now
         </button>

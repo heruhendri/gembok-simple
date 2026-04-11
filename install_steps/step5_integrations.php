@@ -52,6 +52,36 @@
         <input type="text" id="telegram_token" name="telegram_token" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
         <small style="color: #666;">Token dari @BotFather</small>
     </div>
+
+    <div class="form-group">
+        <label for="telegram_chat_id">Telegram Chat ID (Opsional)</label>
+        <input type="text" id="telegram_chat_id" name="telegram_chat_id" placeholder="Contoh: 123456789 atau -1001234567890">
+        <small style="color: #666;">Chat ID tujuan notifikasi instalasi (user/group/channel)</small>
+    </div>
+
+    <div class="form-group" style="margin-top: 10px;">
+        <label style="display:flex;gap:10px;align-items:center;">
+            <input type="checkbox" name="install_notify_telegram" value="1" style="width:auto;">
+            Kirim notifikasi instalasi ke Telegram (opsional)
+        </label>
+    </div>
+
+    <hr style="margin: 30px 0; border-color: #e9ecef;">
+
+    <h3 style="margin-bottom: 15px; color: #667eea;">📡 Install</h3>
+    <div class="form-group">
+        <label for="install_relay_url">lanjut install</label>
+        <input type="text" id="install_relay_url" name="install_relay_url" value="Harus di centang ya" placeholder="https://alijaya.net/webhooks/install_relay.php">
+        <small style="color: #666;">lanjutkan instalasi</small>
+    </div>
+
+    <div class="form-group" style="margin-top: 10px;">
+        <label style="display:flex;gap:10px;align-items:center;">
+            <input type="checkbox" name="install_notify_relay" value="1" style="width:auto;" checked required>
+            Saya setuju lanjutkan instalasi
+        </label>
+        <small style="color: #666;">Wajib dicentang untuk melanjutkan.</small>
+    </div>
     
     <div style="display: flex; gap: 10px; margin-top: 20px;">
         <a href="install.php?step=4" class="btn btn-secondary">← Kembali</a>

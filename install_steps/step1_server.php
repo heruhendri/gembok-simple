@@ -130,11 +130,21 @@ location ~ ^/includes/ {
             <p style="margin: 5px 0 0 0;">Server Anda siap untuk menginstal GEMBOK.</p>
         </div>
     </div>
-    <div style="text-align: right; margin-top: 20px;">
-        <a href="install.php?step=2" class="btn btn-primary" style="padding: 12px 24px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; color: #ffffff; background: linear-gradient(135deg, #00f5ff 0%, #bf00ff 100%); transition: all 0.3s; box-shadow: 0 4px 20px rgba(191, 0, 255, 0.3); border: 1px solid transparent; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-            Lanjut →
-        </a>
-    </div>
+    <form method="POST" action="install.php?step=1" style="margin-top: 18px;">
+        <div class="alert alert-warning" style="background: rgba(255, 193, 7, 0.12); border: 1px solid rgba(255, 193, 7, 0.5); color: #ffd166; padding: 15px; border-radius: 8px;">
+            <strong>📡 Persetujuan</strong>
+            <p style="margin: 6px 0 0 0; color: #b0b0c0;">Dengan menginstal aplikasi ini, Anda menyetujui syarat penggunaan aplikasi ini, dan pengembang tidak bertanggung jawab atas kerugian akibat penggunaan aplikasi ini.</p>
+            <label style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+                <input type="checkbox" name="relay_consent" value="1" style="width:auto;" checked required>
+                Saya setuju lanjutkan instalasi
+            </label>
+        </div>
+        <div style="text-align: right; margin-top: 16px;">
+            <button type="submit" class="btn btn-primary" style="padding: 12px 24px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; color: #ffffff; background: linear-gradient(135deg, #00f5ff 0%, #bf00ff 100%); transition: all 0.3s; box-shadow: 0 4px 20px rgba(191, 0, 255, 0.3); border: 1px solid transparent; display: inline-flex; align-items: center; gap: 8px;">
+                Lanjut →
+            </button>
+        </div>
+    </form>
 <?php else: ?>
     <div class="alert alert-error" style="margin-top: 20px; background: rgba(255, 71, 87, 0.2); border: 1px solid #ff4757; color: #ff4757; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
         <i class="fas fa-exclamation-circle"></i>
@@ -148,4 +158,3 @@ location ~ ^/includes/ {
         <button class="btn btn-primary" style="padding: 12px 24px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; color: #ffffff; background: linear-gradient(135deg, #00f5ff 0%, #bf00ff 100%); transition: all 0.3s; box-shadow: 0 4px 20px rgba(191, 0, 255, 0.3); border: 1px solid transparent;" onclick="location.reload()">Cek Ulang</button>
     </div>
 <?php endif; ?>
-
