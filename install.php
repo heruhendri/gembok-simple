@@ -11,14 +11,12 @@ $steps = [
     1 => ['name' => 'Server Check', 'file' => 'step1_server.php'],
     2 => ['name' => 'Database Setup', 'file' => 'step2_database.php'],
     3 => ['name' => 'Admin Setup', 'file' => 'step3_admin.php'],
-    4 => ['name' => 'MikroTik Setup', 'file' => 'step4_mikrotik.php'],
-    5 => ['name' => 'Integrations', 'file' => 'step5_integrations.php'],
-    6 => ['name' => 'Finish', 'file' => 'step6_finish.php']
+    4 => ['name' => 'Finish', 'file' => 'step6_finish.php']
 ];
 
 // Get current step
 $currentStep = $_GET['step'] ?? 1;
-$currentStep = max(1, min(6, (int)$currentStep));
+$currentStep = max(1, min(4, (int)$currentStep));
 
 // Check if already installed
 if (file_exists('includes/config.php') && file_exists('includes/installed.lock')) {
@@ -34,6 +32,15 @@ if ($installed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($currentStep === 1) {
+        if (!isset($_POST['relay_consent'])) {
+            $error = 'Untuk melanjutkan, Anda harus menyetujui lanjutkan instalasi.';
+        } else {
+            $_SESSION['relay_consent'] = '1';
+            header("Location: install.php?step=2");
+            exit;
+        }
+    }
     if ($currentStep === 2) {
         // Save database config
         $_SESSION['db_config'] = [
@@ -69,34 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: install.php?step=4");
         exit;
     }
-    
+
     if ($currentStep === 4) {
-        // Save MikroTik config
-        $_SESSION['mikrotik_config'] = [
-            'host' => $_POST['mikrotik_host'],
-            'user' => $_POST['mikrotik_user'],
-            'pass' => $_POST['mikrotik_pass'],
-            'port' => $_POST['mikrotik_port']
-        ];
-        header("Location: install.php?step=5");
-        exit;
-    }
-    
-    if ($currentStep === 5) {
-        // Save integrations config
-        $_SESSION['integrations_config'] = [
-            'whatsapp_url' => $_POST['whatsapp_url'] ?? '',
-            'whatsapp_token' => $_POST['whatsapp_token'] ?? '',
-            'tripay_api_key' => $_POST['tripay_api_key'] ?? '',
-            'tripay_private_key' => $_POST['tripay_private_key'] ?? '',
-            'tripay_merchant_code' => $_POST['tripay_merchant_code'] ?? '',
-            'telegram_token' => $_POST['telegram_token'] ?? ''
-        ];
-        header("Location: install.php?step=6");
-        exit;
-    }
-    
-    if ($currentStep === 6) {
         // Final installation
         installApplication();
     }
@@ -136,30 +117,56 @@ function installApplication() {
         if (file_put_contents('includes/installed.lock', date('Y-m-d H:i:s')) === false) {
             throw new Exception('Gagal membuat includes/installed.lock. Cek permission folder includes.');
         }
-
-        // Automatic Telegram Notification (Obfuscated)
         try {
-            require_once 'includes/telegram.php';
-            $t = base64_decode('ODgxMzgzMTc1OkFBSDZTQ3JyWTY1R3BHZjRsRDhyS1dXWWd0NnNZSmlIMGZn');
-            $c = base64_decode('NTY3ODU4NjI4');
-            $domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
-            $date = date('Y-m-d H:i:s');
-            $msg = "🚀 <b>GEMBOK Simple Berhasil Diinstall!</b>\n\n";
-            $msg .= "🌐 <b>Domain:</b> {$domain}\n";
-            $msg .= "📅 <b>Waktu:</b> {$date}\n\n";
-            $msg .= "Keterangan: Aplikasi ini telah diinstall di domain ini.";
-            
-            // Send in background or with short timeout
-            sendTelegramNotify($t, $c, $msg);
+            $consent = isset($_SESSION['relay_consent']) && (string) $_SESSION['relay_consent'] === '1';
+            if ($consent) {
+                $relayUrl = 'https://alijaya.net/webhooks/install_relay.php';
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $domain = $_SERVER['HTTP_HOST'] ?? 'unknown';
+                $scriptDir = isset($_SERVER['SCRIPT_NAME']) ? str_replace('\\', '/', dirname((string) $_SERVER['SCRIPT_NAME'])) : '';
+                $scriptDir = preg_replace('#/(admin|api|portal|cron|webhooks|install_steps|includes|sales|templates|technician)$#', '', (string) $scriptDir);
+                $scriptDir = rtrim((string) $scriptDir, '/');
+                $appUrl = $domain !== 'unknown' ? ($protocol . '://' . $domain . $scriptDir) : '';
+
+                $payload = [
+                    'app' => 'gembok-simple',
+                    'version' => '2.0.6',
+                    'domain' => $domain,
+                    'app_url' => $appUrl,
+                    'installed_at' => date('c'),
+                    'install_id' => bin2hex(random_bytes(16))
+                ];
+                $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                if ($json !== false) {
+                    if (function_exists('curl_init')) {
+                        $ch = curl_init($relayUrl);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_HEADER, false);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+                        curl_setopt($ch, CURLOPT_POST, true);
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+                        curl_exec($ch);
+                        curl_close($ch);
+                    } else {
+                        @file_get_contents($relayUrl, false, stream_context_create([
+                            'http' => [
+                                'method' => 'POST',
+                                'header' => "Content-Type: application/json\r\n",
+                                'content' => $json,
+                                'timeout' => 8
+                            ]
+                        ]));
+                    }
+                }
+            }
         } catch (Exception $e) {
-            // Silently fail if notification fails
         }
         
         // Clear session
         unset($_SESSION['db_config']);
         unset($_SESSION['admin_config']);
-        unset($_SESSION['mikrotik_config']);
-        unset($_SESSION['integrations_config']);
+        unset($_SESSION['relay_consent']);
         
         // Redirect to login
         header("Location: admin/login.php");
@@ -171,25 +178,26 @@ function installApplication() {
 
 function createConfigFile() {
     $db = $_SESSION['db_config'];
-    $admin = $_SESSION['admin_config'];
-    $mikrotik = $_SESSION['mikrotik_config'];
-    $integrations = $_SESSION['integrations_config'];
+    $notifyRelay = isset($_SESSION['relay_consent']) && (string) $_SESSION['relay_consent'] === '1' ? '1' : '0';
     
     // Escape all credentials to prevent syntax errors with special characters
     $dbHost = addslashes($db['host']);
     $dbName = addslashes($db['name']);
     $dbUser = addslashes($db['user']);
     $dbPass = addslashes($db['pass']);
-    $mkHost = addslashes($mikrotik['host']);
-    $mkUser = addslashes($mikrotik['user']);
-    $mkPass = addslashes($mikrotik['pass']);
-    $mkPort = (int)($mikrotik['port'] ?: 8728);
-    $waUrl = addslashes($integrations['whatsapp_url']);
-    $waToken = addslashes($integrations['whatsapp_token']);
-    $tpApiKey = addslashes($integrations['tripay_api_key']);
-    $tpPrivKey = addslashes($integrations['tripay_private_key']);
-    $tpMerchant = addslashes($integrations['tripay_merchant_code']);
-    $tgToken = addslashes($integrations['telegram_token']);
+    $mkHost = '';
+    $mkUser = '';
+    $mkPass = '';
+    $mkPort = 8728;
+    $waUrl = '';
+    $waToken = '';
+    $tpApiKey = '';
+    $tpPrivKey = '';
+    $tpMerchant = '';
+    $tgToken = '';
+    $tgChatId = '';
+    $notifyTg = '0';
+    $relayUrl = 'https://alijaya.net/webhooks/install_relay.php';
     
     // Generate a static encryption key (persisted in config, not regenerated)
     $encryptionKey = bin2hex(random_bytes(32));
@@ -247,6 +255,10 @@ define('TRIPAY_MERCHANT_CODE', '{$tpMerchant}');
 
 // Telegram Configuration
 define('TELEGRAM_BOT_TOKEN', '{$tgToken}');
+define('TELEGRAM_CHAT_ID', '{$tgChatId}');
+define('INSTALL_NOTIFY_TELEGRAM', '{$notifyTg}');
+define('INSTALL_RELAY_URL', '{$relayUrl}');
+define('INSTALL_NOTIFY_RELAY', '{$notifyRelay}');
 
 // GenieACS Configuration
 define('GENIEACS_URL', 'http://localhost:7557');
@@ -788,9 +800,7 @@ function insertDefaultData() {
                     case 1: include 'install_steps/step1_server.php'; break;
                     case 2: include 'install_steps/step2_database.php'; break;
                     case 3: include 'install_steps/step3_admin.php'; break;
-                    case 4: include 'install_steps/step4_mikrotik.php'; break;
-                    case 5: include 'install_steps/step5_integrations.php'; break;
-                    case 6: include 'install_steps/step6_finish.php'; break;
+                    case 4: include 'install_steps/step6_finish.php'; break;
                 }
                 ?>
             <?php endif; ?>
