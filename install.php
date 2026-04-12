@@ -147,7 +147,7 @@ function installApplication() {
                         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
                         curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
                         curl_exec($ch);
-                        curl_close($ch);
+                        unset($ch);
                     } else {
                         @file_get_contents($relayUrl, false, stream_context_create([
                             'http' => [
@@ -276,6 +276,7 @@ function createDatabaseTables() {
     try {
         $version = (string)$pdo->query("SELECT VERSION()")->fetchColumn();
     } catch (Exception $e) {
+        unset($e);
         $version = '';
     }
     if ($version !== '') {
