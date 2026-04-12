@@ -133,6 +133,10 @@ if ($device) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage ONT - <?php echo htmlspecialchars($customer['name']); ?></title>
+    <meta name="theme-color" content="#0a0a12">
+    <link rel="manifest" href="../../manifest.json">
+    <link rel="apple-touch-icon" href="../../assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="../../assets/icons/icon-192x192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -651,5 +655,12 @@ if ($device) {
     </script>
     
     <?php require_once '../includes/bottom_nav.php'; ?>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('../../sw.js');
+            });
+        }
+    </script>
 </body>
 </html>

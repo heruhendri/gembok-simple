@@ -83,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Save as JPG with 70% quality
                 if (imagejpeg($tmpImg, $targetFile, 70)) {
                     $photoPath = "uploads/tickets/" . $newName;
-                    imagedestroy($tmpImg);
-                    imagedestroy($sourceImg);
+                    unset($tmpImg);
+                    unset($sourceImg);
                 } else {
                     setFlash('error', 'Gagal memproses gambar.');
                     redirect("view_ticket.php?id=$ticketId");
@@ -125,6 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Tiket #<?php echo $ticketId; ?></title>
+    <meta name="theme-color" content="#0a0a12">
+    <link rel="manifest" href="../../manifest.json">
+    <link rel="apple-touch-icon" href="../../assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="../../assets/icons/icon-192x192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -395,5 +399,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 
     <?php require_once '../includes/bottom_nav.php'; ?>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('../../sw.js');
+            });
+        }
+    </script>
 </body>
 </html>
