@@ -1,26 +1,22 @@
 const CACHE_NAME = 'gembok-isp-v1';
+const SCOPE_URL = self.registration && self.registration.scope ? self.registration.scope : self.location.origin + '/';
 const urlsToCache = [
-    '/',
-    '/index.php',
-    '/portal/login.php',
-    '/admin/login.php',
-    '/sales/login.php',
-    '/technician/login.php',
-    '/assets/css/bootstrap.min.css',
-    '/assets/css/style.css',
-    '/assets/js/jquery.min.js',
-    '/assets/js/bootstrap.bundle.min.js',
-    '/assets/js/main.js',
-    '/assets/icons/icon-192x192.png',
-    '/assets/icons/icon-512x512.png',
-    '/manifest.json'
+    new URL('./', SCOPE_URL).toString(),
+    new URL('index.php', SCOPE_URL).toString(),
+    new URL('portal/login.php', SCOPE_URL).toString(),
+    new URL('admin/login.php', SCOPE_URL).toString(),
+    new URL('sales/login.php', SCOPE_URL).toString(),
+    new URL('technician/login.php', SCOPE_URL).toString(),
+    new URL('assets/icons/icon-192x192.png', SCOPE_URL).toString(),
+    new URL('assets/icons/icon-512x512.png', SCOPE_URL).toString(),
+    new URL('manifest.json', SCOPE_URL).toString()
 ];
 
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                return cache.addAll(urlsToCache);
+                return Promise.allSettled(urlsToCache.map(url => cache.add(url)));
             })
     );
 });
