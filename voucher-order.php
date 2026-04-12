@@ -95,8 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'payment_method' => $oldMethod
                 ]);
                 if ($orderResult['success'] ?? false) {
-                    $usePretty = (string) getSetting('USE_PRETTY_URLS', '1') === '1';
-                    $statusUrl = rtrim(APP_URL, '/') . ($usePretty
+                    $usePrettySetting = (string) getSetting('USE_PRETTY_URLS', '1') === '1';
+                    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+                    $canPretty = $usePrettySetting && preg_match('~^/voucher(/|$)~', (string) $requestPath);
+                    $statusUrl = rtrim(APP_URL, '/') . ($canPretty
                         ? ('/voucher/status/' . rawurlencode($orderResult['order_number']))
                         : ('/voucher-status.php?order=' . rawurlencode($orderResult['order_number']))
                     );

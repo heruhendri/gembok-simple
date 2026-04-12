@@ -37,10 +37,13 @@ if ($safeOrder === '') {
         $message = 'Order tidak ditemukan.';
     }
 }
-$usePretty = (string) getSetting('USE_PRETTY_URLS', '1') === '1';
+$usePrettySetting = (string) getSetting('USE_PRETTY_URLS', '1') === '1';
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+$canPretty = $usePrettySetting && preg_match('~^/voucher(/|$)~', (string) $requestPath);
+$orderFormUrl = rtrim(APP_URL, '/') . ($canPretty ? '/voucher' : '/voucher-order.php');
 $statusOrderUrl = $safeOrder !== ''
-    ? (rtrim(APP_URL, '/') . ($usePretty ? ('/voucher/status/' . rawurlencode($safeOrder)) : ('/voucher-status.php?order=' . rawurlencode($safeOrder))))
-    : (rtrim(APP_URL, '/') . ($usePretty ? '/voucher' : '/voucher-order.php'));
+    ? (rtrim(APP_URL, '/') . ($canPretty ? ('/voucher/status/' . rawurlencode($safeOrder)) : ('/voucher-status.php?order=' . rawurlencode($safeOrder))))
+    : $orderFormUrl;
 ?>
 <!doctype html>
 <html lang="id">
@@ -77,7 +80,7 @@ $statusOrderUrl = $safeOrder !== ''
         <h1 class="title">Status Order Voucher</h1>
         <?php if ($message !== ''): ?>
             <div class="error"><?php echo htmlspecialchars($message); ?></div>
-            <a class="btn btn-dark" href="<?php echo APP_URL; ?>/voucher">Kembali ke Form Order</a>
+            <a class="btn btn-dark" href="<?php echo htmlspecialchars($orderFormUrl); ?>">Kembali ke Form Order</a>
         <?php else: ?>
             <p class="meta">No Order: <strong><?php echo htmlspecialchars($order['order_number']); ?></strong></p>
             <?php
@@ -109,7 +112,7 @@ $statusOrderUrl = $safeOrder !== ''
                     <a class="btn btn-dark" href="<?php echo htmlspecialchars($statusOrderUrl . '?check=1'); ?>">Kirim Ulang WhatsApp</a>
                 <?php elseif (($order['status'] ?? '') === 'failed' || ($order['status'] ?? '') === 'expired'): ?>
                     <div class="warn">Pembayaran tidak berhasil atau kedaluwarsa. Silakan buat order baru.</div>
-                    <a class="btn btn-dark" href="<?php echo APP_URL; ?>/voucher">Buat Order Baru</a>
+                    <a class="btn btn-dark" href="<?php echo htmlspecialchars($orderFormUrl); ?>">Buat Order Baru</a>
                 <?php endif; ?>
             </div>
 
@@ -127,7 +130,7 @@ $statusOrderUrl = $safeOrder !== ''
             <?php endif; ?>
 
             <div style="margin-top: 12px;">
-                <a class="btn btn-dark" href="<?php echo APP_URL; ?>/voucher">Order Voucher Lain</a>
+                <a class="btn btn-dark" href="<?php echo htmlspecialchars($orderFormUrl); ?>">Order Voucher Lain</a>
             </div>
         <?php endif; ?>
     </div>
