@@ -40,6 +40,10 @@ if (isset($_GET['switch_router'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?> - <?php echo APP_NAME; ?></title>
     <meta name="description" content="<?php echo htmlspecialchars($pageDescription); ?>">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="../manifest.json">
+    <link rel="apple-touch-icon" href="../assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="../assets/icons/icon-192x192.png">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1010,6 +1014,12 @@ if (isset($_GET['switch_router'])) {
                 }
             });
         });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../sw.js');
+            });
+        }
     </script>
 </body>
 

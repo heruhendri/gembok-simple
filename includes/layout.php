@@ -41,6 +41,10 @@ if (isset($_GET['switch_router'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?> - <?php echo htmlspecialchars($appName); ?></title>
     <meta name="description" content="<?php echo htmlspecialchars($pageDescription); ?>">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="../manifest.json">
+    <link rel="apple-touch-icon" href="../assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="../assets/icons/icon-192x192.png">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1122,6 +1126,12 @@ if (isset($_GET['switch_router'])) {
                     <span>GenieACS</span>
                 </a>
 
+                <a href="<?php echo APP_URL; ?>/admin/hioso.php"
+                    class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'hioso.php' ? 'active' : ''; ?>">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Hioso OLT</span>
+                </a>
+
                 <a href="<?php echo APP_URL; ?>/admin/map.php"
                     class="menu-item <?php echo basename($_SERVER['PHP_SELF']) === 'map.php' ? 'active' : ''; ?>">
                     <i class="fas fa-map-marked-alt"></i>
@@ -1306,6 +1316,12 @@ if (isset($_GET['switch_router'])) {
                 }
             });
         });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('../sw.js');
+            });
+        }
     </script>
 </body>
 
