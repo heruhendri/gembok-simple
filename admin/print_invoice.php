@@ -40,7 +40,8 @@ foreach ($invoices as $inv) {
 }
 
 // App Settings
-$appName = APP_NAME;
+$appName = trim((string) getSetting('app_name', defined('APP_NAME') ? APP_NAME : ''));
+$appName = $appName !== '' ? $appName : (defined('APP_NAME') ? APP_NAME : 'GEMBOK');
 $appUrl = APP_URL;
 $qrUrl = rtrim((string) $appUrl, '/') . '/admin/print_invoice.php?ids=' . rawurlencode(implode(',', $invoiceIds));
 $managerName = trim((string) getSetting('invoice_manager_name', ''));
